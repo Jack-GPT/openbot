@@ -6,6 +6,27 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.68.1] - 2026-11-13
+
+### Added
+
+- Choose Codex or MOSS for live voice in desktop Voice settings. MOSS offers the default voice, Nuannuan, and Mumu.
+- Choose Kokoro v1.1 (ZH) to read Chinese and English replies with a local voice.
+- On supported Windows 11 computers, choose Solid, Frosted glass (Mica), or Acrylic. Adjust transparency across the workspace and chat backgrounds. macOS also has a transparency slider.
+
+### Changed
+
+- Windows controls share the OpenBot toolbar in the main window and separate chat windows.
+
+### Fixed
+
+- Windows provider update notifications open below the window controls.
+- MOSS Live plays reply audio without gaps between chunks that arrive in time for playback.
+- Codex live voice waits for the audio connection before it shows Listening. If the connection fails, the voice pane shows an error and releases the microphone.
+- OpenCode discovers models in a temporary folder and deletes its discovery sessions. Before, empty sessions stayed in OpenCode's history.
+- Agent replies play aloud in a separate chat window after dictation or a voice conversation.
+- OpenBot reads Chinese replies on Windows with an installed Chinese voice when Supertonic 3 is selected.
+
 ## [0.68.0] - 2026-11-11
 
 ### Added
