@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "الأحداث غير متاحة على هذا المضيف.",
   "error.backend.databaseIntegrity": "فشلت قاعدة بيانات OpenBot في فحص السلامة.",
   "error.backend.webhookRouteLimit": "يمكن أن يحتوي المضيف على {limit} مهام دورية webhook كحد أقصى.",
+  "error.backend.windowAppearanceInvalid": "تحقق من إعدادات مظهر النافذة.",
   "error.backend.webhookSettingsInvalid": "تحقق من إعدادات webhook وحاول مرة أخرى.",
   "error.backend.webhookSenderSecretInvalid":
     "الصق سر التوقيع الكامل من المُرسِل. يحتوي على 16 إلى 1024 حرفًا بدون مسافات.",

@@ -73,6 +73,7 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isAppThemePaletteId,
+  isAppWindowMaterial,
   isAvatarColor,
   isBrowserDockAction,
   isBrowserDockFrame,
@@ -86,6 +87,7 @@ import {
   isMemoryReviewInterval,
   isRemoteNetworkRoute,
   isSkillCategory,
+  isWindowTransparency,
   MAC_AUTOMATION_TARGETS,
   QUIT_GUARDS,
   RENDERER_TIMING_LIMITS,
@@ -99,6 +101,7 @@ import {
   isString,
 } from "@openbot/contracts/runtime-values";
 import { validateProfileName } from "@openbot/contracts/validation";
+import { sourceText } from "@openbot/i18n/source";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, optionalBoolean, requireString } from "./validation";
 
@@ -217,16 +220,32 @@ function parseFontFamily(value: unknown): AppFontFamily | null {
 
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark, interfaceFont, codeFont } =
-    input;
+  const {
+    appearance,
+    transparentWindow,
+    windowMaterial,
+    windowTransparency,
+    palette,
+    chatBackgroundLight,
+    chatBackgroundDark,
+    interfaceFont,
+    codeFont,
+  } = input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
+  if (
+    (windowMaterial !== undefined && !isAppWindowMaterial(windowMaterial)) ||
+    (windowTransparency !== undefined && !isWindowTransparency(windowTransparency))
+  )
+    throw new Error(sourceText("error.backend.windowAppearanceInvalid"));
   if (palette !== undefined && palette !== null && !isAppThemePaletteId(palette))
     throw new Error("Theme palette is invalid.");
   if (
     appearance === undefined &&
     transparentWindow === undefined &&
+    windowMaterial === undefined &&
+    windowTransparency === undefined &&
     palette === undefined &&
     chatBackgroundLight === undefined &&
     chatBackgroundDark === undefined &&
@@ -237,6 +256,8 @@ export function parseAppAppearancePreference(input: unknown): SetAppAppearancePr
   return {
     ...(appearance === undefined ? {} : { appearance }),
     ...(transparentWindow === undefined ? {} : { transparentWindow }),
+    ...(windowMaterial === undefined ? {} : { windowMaterial }),
+    ...(windowTransparency === undefined ? {} : { windowTransparency }),
     ...(palette === undefined ? {} : { palette }),
     ...(chatBackgroundLight === undefined ? {} : { chatBackgroundLight: parseChatBackground(chatBackgroundLight) }),
     ...(chatBackgroundDark === undefined ? {} : { chatBackgroundDark: parseChatBackground(chatBackgroundDark) }),

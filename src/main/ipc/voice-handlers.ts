@@ -16,6 +16,7 @@ import type {
   VoiceStream,
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import {
   decodeLiveVoiceSessionResponse,
   isLiveVoiceName,
@@ -23,19 +24,26 @@ import {
   LIVE_VOICE_ROUTES,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { sourceText } from "@openbot/i18n/source";
-import type { WebContents } from "electron";
+import { Effect } from "effect";
+import { BrowserWindow, type WebContents } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { MossLiveSession } from "../moss-live";
 import { acceptEmpty } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { sendToRenderer } from "../renderer-ipc";
 import { voiceLiveEventFromWire } from "../team-api/route-live-voice";
+import type { VoiceApiKeyStore } from "../voice-api-key-store";
 import type { VoiceServerService } from "../voice-server-service";
 import type { VoiceSpeechService } from "../voice-speech-service";
 import type { VoiceTranscriptionService } from "../voice-transcription-service";
 import { agentRequest } from "./agent-inputs";
-import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { eventHandler, eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import {
+  parseMossAudio,
+  parseMossControl,
+  parseMossKey,
   parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
@@ -55,6 +63,7 @@ import {
 export interface VoiceIpcDependencies {
   voice: VoiceTranscriptionService;
   speech: VoiceSpeechService;
+  mossKey: VoiceApiKeyStore;
   /** The user's own server. While one of its routes is on, it replaces the model on this computer. */
   server: VoiceServerService;
   /** Keeps a voice turn's recording as an attachment draft. Voice turns go to this computer's host only. */
@@ -71,13 +80,27 @@ const REMOTE_LIVE_START_TIMEOUT_MS = 60_000;
 export function voiceIpcHandlers({
   voice,
   speech,
+  mossKey,
   server,
   service,
   remoteServers,
   forwardLiveEvent,
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
+  const mossSessions = new Map<WebContents, MossLiveSession>();
+  const watchedMossOwners = new WeakSet<WebContents>();
+  const stopMoss = (owner: WebContents) => {
+    mossSessions.get(owner)?.close();
+    mossSessions.delete(owner);
+  };
+  const stopAllMoss = (error: string) => {
+    for (const owner of mossSessions.keys()) {
+      stopMoss(owner);
+      sendToRenderer(BrowserWindow.fromWebContents(owner), IPC_ENDPOINTS.voice.mossEvent, { type: "ended", error });
+    }
+  };
   // A window that closes, reloads or crashes cannot stop its live voice any more, so main stops it.
-  const liveSessions = new WeakMap<WebContents, Set<string>>();
+  const liveSessions = new Map<WebContents, Set<string>>();
+  const watchedLiveOwners = new WeakSet<WebContents>();
   /** The joined server of each remote session. A session that is not here runs on this computer. */
   const remoteSessions = new Map<string, string>();
   const stopLive = (sessionId: string): Promise<void> => {
@@ -108,11 +131,14 @@ export function voiceIpcHandlers({
         forwardLiveEvent({ type: "ended", sessionId, error: null });
       }
   });
-  const stopLiveSessions = (owner: WebContents) => {
+  const stopLiveSessions = (owner: WebContents, reason?: string) => {
     const sessions = liveSessions.get(owner);
     if (!sessions) return;
-    for (const sessionId of sessions) void stopLive(sessionId).catch(() => undefined);
-    sessions.clear();
+    liveSessions.delete(owner);
+    for (const sessionId of sessions) {
+      if (reason) forwardLiveEvent({ type: "ended", sessionId, error: reason });
+      void stopLive(sessionId).catch(() => undefined);
+    }
   };
   const watchLiveOwner = (owner: WebContents, sessionId: string) => {
     const sessions = liveSessions.get(owner);
@@ -121,6 +147,8 @@ export function voiceIpcHandlers({
       return;
     }
     liveSessions.set(owner, new Set([sessionId]));
+    if (watchedLiveOwners.has(owner)) return;
+    watchedLiveOwners.add(owner);
     owner.once("destroyed", () => stopLiveSessions(owner));
     owner.on("render-process-gone", () => stopLiveSessions(owner));
     owner.on("did-start-navigation", (details) => {
@@ -179,10 +207,14 @@ export function voiceIpcHandlers({
       ),
       cancelStream: payloadHandler(parseVoiceStream, (stream): void => voice.cancelStream(stream)),
       getSpeechSettings: handler((): SpeechSettings => speech.getSettings()),
-      setSpeechSettings: payloadHandler(
-        parseSpeechSettings,
-        (settings): Promise<SpeechSettings> => runCauseEffect(speech.setSettings(settings)),
-      ),
+      setSpeechSettings: payloadHandler(parseSpeechSettings, async (settings): Promise<SpeechSettings> => {
+        const saved = await runCauseEffect(speech.setSettings(settings));
+        if (!saved.mossLive) stopAllMoss(sourceText("error.voice.live.disconnected"));
+        if (!saved.codexLive) {
+          for (const owner of liveSessions.keys()) stopLiveSessions(owner, sourceText("error.voice.live.off"));
+        }
+        return saved;
+      }),
       getSpeechModelStatus: handler((): Promise<SpeechModelStatus> => runCauseEffect(speech.getModelStatus())),
       setSpeechApiKey: payloadHandler(parseSpeechApiKey, async ({ provider, key }): Promise<SpeechModelStatus> => {
         if (provider === "xai") return runCauseEffect(speech.setXaiApiKey(key));
@@ -246,7 +278,7 @@ export function voiceIpcHandlers({
               return started;
             },
           });
-          if (event.sender.isDestroyed()) {
+          if (event.sender.isDestroyed() || !speech.getSettings().codexLive) {
             await stopLive(session.sessionId);
             throw new Error(sourceText("error.voice.live.disconnected"));
           }
@@ -255,9 +287,58 @@ export function voiceIpcHandlers({
         },
       ),
       stopLive: eventPayloadHandler(parseVoiceLiveStop, ({ sender }, { sessionId }): Promise<void> => {
-        liveSessions.get(sender)?.delete(sessionId);
+        const sessions = liveSessions.get(sender);
+        sessions?.delete(sessionId);
+        if (sessions?.size === 0) liveSessions.delete(sender);
         return stopLive(sessionId);
       }),
+      mossKeySaved: handler(() => mossKey.get() !== null),
+      setMossKey: payloadHandler(parseMossKey, ({ key }) =>
+        Effect.runPromise(
+          mossKey.set(key).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                if (key === null) stopAllMoss(sourceText("error.voice.cloud.keyRequired", { provider: "MOSS" }));
+              }),
+            ),
+            Effect.as(key !== null),
+            Effect.mapError(() => new Error(sourceText("error.voice.cloud.keySaveFailed", { provider: "MOSS" }))),
+          ),
+        ),
+      ),
+      startMoss: eventHandler(async ({ sender }) => {
+        const { mossLive, mossLiveVoice } = speech.getSettings();
+        if (!mossLive) throw new Error(sourceText("error.voice.moss.failed"));
+        const key = mossKey.get();
+        if (!key) throw new Error(sourceText("error.voice.cloud.keyRequired", { provider: "MOSS" }));
+        stopMoss(sender);
+        const session = new MossLiveSession(key, mossLiveVoice ?? null, (event) => {
+          if (mossSessions.get(sender) !== session) return;
+          sendToRenderer(BrowserWindow.fromWebContents(sender), IPC_ENDPOINTS.voice.mossEvent, event);
+          if (event.type === "ended") mossSessions.delete(sender);
+        });
+        mossSessions.set(sender, session);
+        if (!watchedMossOwners.has(sender)) {
+          watchedMossOwners.add(sender);
+          sender.once("destroyed", () => stopMoss(sender));
+          sender.on("render-process-gone", () => stopMoss(sender));
+          sender.on("did-start-navigation", (details) => {
+            if (details.isMainFrame && !details.isSameDocument) stopMoss(sender);
+          });
+        }
+        try {
+          await Effect.runPromise(session.ready);
+        } catch (error) {
+          session.close();
+          if (mossSessions.get(sender) === session) mossSessions.delete(sender);
+          throw error;
+        }
+      }),
+      stopMoss: eventHandler(({ sender }) => stopMoss(sender)),
+      mossAudio: eventPayloadHandler(parseMossAudio, ({ sender }, pcm) => mossSessions.get(sender)?.audio(pcm)),
+      mossControl: eventPayloadHandler(parseMossControl, ({ sender }, input) =>
+        mossSessions.get(sender)?.control(input),
+      ),
     },
   };
 }

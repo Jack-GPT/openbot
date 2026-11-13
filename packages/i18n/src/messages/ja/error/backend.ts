@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
+  "error.backend.windowAppearanceInvalid": "ウィンドウの外観設定を確認してください。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
   "error.backend.webhookSenderSecretInvalid":
     "送信元の署名シークレットをすべて貼り付けてください。16〜1024 文字で、空白は含みません。",

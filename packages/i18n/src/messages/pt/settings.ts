@@ -14,6 +14,12 @@ export const messages = {
   "settings.appearance.transparentWindow.title": "Janela transparente",
   "settings.appearance.transparentWindow.description":
     "Mostra a área de trabalho desfocada atrás da janela. Sites e menus passam a usar o tema do app.",
+  "settings.appearance.windowMaterial.title": "Material da janela",
+  "settings.appearance.windowMaterial.description": "Aplica um efeito ao espaço de trabalho e ao fundo das conversas.",
+  "settings.appearance.windowMaterial.solid": "Opaco",
+  "settings.appearance.windowMaterial.mica": "Vidro fosco (Mica)",
+  "settings.appearance.windowMaterial.acrylic": "Acrílico",
+  "settings.appearance.windowTransparency.title": "Transparência",
   "settings.interfaceSize.title": "Tamanho da interface",
   "settings.interfaceSize.description": "O tamanho do texto e dos controles no OpenBot.",
   "settings.interfaceFont.title": "Fonte da interface",
@@ -666,6 +672,8 @@ export const messages = {
   "settings.voice.apiKey.removeFailed": "Não foi possível remover a chave de API. Tente novamente.",
   "settings.voice.speech.section": "Respostas faladas",
   "settings.voice.speech.model.description": "Lê as respostas em voz alta neste computador, em 31 idiomas.",
+  "settings.voice.speech.model.kokoro.description": "Lê em voz alta em chinês e inglês neste computador.",
+  "settings.voice.speech.model.kokoro.sample": "你好，今天过得怎么样？别着急，我们可以慢慢聊。",
   "settings.voice.speech.readReplies.title": "Ler respostas em voz alta",
   "settings.voice.speech.readReplies.description":
     "Quando você dita uma mensagem, a resposta é lida em voz alta. Dite de novo para parar.",
@@ -683,6 +691,13 @@ export const messages = {
   "settings.voice.speech.sample": "Olá. É assim que suas respostas vão soar.",
   "settings.voice.speech.listenFailed": "Não foi possível reproduzir a amostra.",
   "settings.voice.live.section": "Voz ao vivo",
+  "settings.voice.live.provider": "Provedor",
+  "settings.voice.live.moss.title": "MOSS Live",
+  "settings.voice.live.moss.description":
+    "Envia o áudio do microfone e as respostas do agente ao MOSS durante a conversa por voz.",
+  "settings.voice.live.moss.voice.default": "Padrão",
+  "settings.voice.live.moss.voice.nuannuan": "Nuannuan",
+  "settings.voice.live.moss.voice.mumu": "Mumu",
   "settings.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
   "settings.transfer.title": "Mover este servidor para outro computador",
   "settings.transfer.lede":

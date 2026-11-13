@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "Bu ana makinede etkinlikler kullanılamıyor.",
   "error.backend.databaseIntegrity": "OpenBot veritabanı bütünlük denetiminden geçemedi.",
   "error.backend.webhookRouteLimit": "Bir ana makinede en fazla {limit} webhook rutini olabilir.",
+  "error.backend.windowAppearanceInvalid": "Pencere görünüm ayarlarını kontrol edin.",
   "error.backend.webhookSettingsInvalid": "Webhook ayarlarını kontrol edin ve tekrar deneyin.",
   "error.backend.webhookSenderSecretInvalid":
     "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",

@@ -101,3 +101,14 @@
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
+
+/* Keep the close button below the native title bar overlay, including at higher interface zoom. */
+.ui-toaster[data-y-position="top"]:has(.provider-update-toast) {
+  top: max(var(--offset-top), calc(env(titlebar-area-height, 0px) + var(--openbot-space-3)));
+}
+
+@media (max-width: 600px) {
+  .ui-toaster[data-y-position="top"]:has(.provider-update-toast) {
+    top: max(var(--mobile-offset-top), calc(env(titlebar-area-height, 0px) + var(--openbot-space-3)));
+  }
+}

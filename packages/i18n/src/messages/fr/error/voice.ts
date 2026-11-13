@@ -37,4 +37,5 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI a refusé de démarrer la voix en direct. Réessayez plus tard, ou désactivez la voix en direct dans Réglages pour parler à la voix.",
   "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
+  "error.voice.moss.failed": "MOSS Live n’a pas pu se connecter. Vérifiez votre clé API, puis réessayez.",
 } as const satisfies PartialTranslation<typeof source>;

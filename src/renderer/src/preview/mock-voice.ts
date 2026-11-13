@@ -5,6 +5,8 @@ import {
   type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
   isLocalVoiceModelId,
+  KOKORO_SPEECH_MODEL,
+  type LocalSpeechModelId,
   type OpenBotDesktopApi,
   SPEECH_MODEL_ID,
   type SpeechKeyProvider,
@@ -81,24 +83,32 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const transcriptListeners = new Set<Listener<VoiceStreamTranscript>>();
   const transfers = new Map<VoiceModelId, { settle: (status: VoiceModelStatus) => void }>();
   let speechSettings: SpeechSettings = clone(options.speechSettings ?? DEFAULT_SPEECH_SETTINGS);
-  // The status of Supertonic. The status of a cloud model follows its provider's key.
-  let supertonicStatus: SpeechModelStatus = options.speechModelReady
-    ? { modelId: SPEECH_MODEL_ID, phase: "ready", progress: 100, message: null }
-    : { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
+  const localSpeechStatus = new Map<LocalSpeechModelId, SpeechModelStatus>(
+    ([SPEECH_MODEL_ID, KOKORO_SPEECH_MODEL.id] as const).map((modelId) => [
+      modelId,
+      options.speechModelReady
+        ? { modelId, phase: "ready", progress: 100, message: null }
+        : { modelId, phase: "missing", progress: null, message: null },
+    ]),
+  );
   const speechListeners = new Set<Listener<SpeechModelStatus>>();
-  let speechTransfer: { settle: (status: SpeechModelStatus) => void } | null = null;
+  let speechTransfer: { modelId: LocalSpeechModelId; settle: (status: SpeechModelStatus) => void } | null = null;
   let server: VoiceServerSettings | null = clone(options.voiceServer ?? null);
   const serverListeners = new Set<Listener<VoiceServerSettings | null>>();
   const liveListeners = new Set<Listener<VoiceLiveEvent>>();
   const liveAnswerers = new Map<string, RTCPeerConnection>();
   let xaiKeySaved = options.xaiKeySaved ?? false;
+  let mossKeySaved = false;
   const keySaved = (provider: SpeechKeyProvider) =>
     provider === "xai" ? xaiKeySaved : ready.has(ELEVENLABS_VOICE_MODEL_ID);
   const speechStatus = (): SpeechModelStatus => {
     const { modelId } = speechSettings;
     const cloud = cloudSpeechModel(modelId);
-    if (!cloud) return clone(supertonicStatus);
-    return keySaved(cloud.provider)
+    if (modelId === SPEECH_MODEL_ID || modelId === KOKORO_SPEECH_MODEL.id) {
+      const status = localSpeechStatus.get(modelId);
+      if (status) return clone(status);
+    }
+    return cloud && keySaved(cloud.provider)
       ? { modelId, phase: "ready", progress: 100, message: null }
       : { modelId, phase: "missing", progress: null, message: null };
   };
@@ -106,24 +116,37 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     emit(speechListeners, speechStatus());
     return speechStatus();
   };
-  const setSpeechStatus = (next: SpeechModelStatus) => {
-    supertonicStatus = next;
-    if (speechSettings.modelId === SPEECH_MODEL_ID) emit(speechListeners, clone(next));
+  const setSpeechStatus = (modelId: LocalSpeechModelId, phase: SpeechModelStatus["phase"], progress: number | null) => {
+    const next = { modelId, phase, progress, message: null };
+    localSpeechStatus.set(modelId, next);
+    if (speechSettings.modelId === modelId) emit(speechListeners, clone(next));
+    return next;
+  };
+  const stopSpeechTransfer = () => {
+    const transfer = speechTransfer;
+    if (!transfer) return;
+    speechTransfer = null;
+    transfer.settle(setSpeechStatus(transfer.modelId, "missing", null));
   };
   const downloadSpeech = () =>
     new Promise<SpeechModelStatus>((resolve) => {
-      if (speechSettings.modelId !== SPEECH_MODEL_ID || supertonicStatus.phase === "ready")
+      const { modelId } = speechSettings;
+      if (
+        (modelId !== SPEECH_MODEL_ID && modelId !== KOKORO_SPEECH_MODEL.id) ||
+        localSpeechStatus.get(modelId)?.phase === "ready"
+      )
         return resolve(speechStatus());
-      const transfer = { settle: resolve };
+      stopSpeechTransfer();
+      const transfer = { modelId, settle: resolve };
       speechTransfer = transfer;
       const advance = (progress: number) => {
         if (speechTransfer !== transfer) return;
         if (progress >= 100) {
           speechTransfer = null;
-          setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "ready", progress: 100, message: null });
+          setSpeechStatus(modelId, "ready", 100);
           return resolve(speechStatus());
         }
-        setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "downloading", progress, message: null });
+        setSpeechStatus(modelId, "downloading", progress);
         schedule(() => advance(progress + 10), 200);
       };
       advance(0);
@@ -218,16 +241,20 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       return () => transcriptListeners.delete(listener);
     },
     getSpeechSettings: async () => clone(speechSettings),
+    mossKeySaved: async () => mossKeySaved,
+    setMossKey: async ({ key }) => {
+      mossKeySaved = key !== null;
+      return mossKeySaved;
+    },
+    startMoss: async () => undefined,
+    stopMoss: async () => undefined,
+    mossAudio: async () => undefined,
+    mossControl: async () => undefined,
+    onMossEvent: () => () => undefined,
     setSpeechSettings: async (next) => {
       const changed = next.modelId !== speechSettings.modelId;
-      if (changed && speechTransfer) {
-        // As in main, a Supertonic download stops when the user chooses another model.
-        const transfer = speechTransfer;
-        speechTransfer = null;
-        supertonicStatus = { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
-        transfer.settle(clone(supertonicStatus));
-      }
-      speechSettings = clone(next);
+      if (changed) stopSpeechTransfer();
+      speechSettings = clone({ ...next, codexLive: next.codexLive && !next.mossLive });
       if (changed) announceSpeech();
       return clone(speechSettings);
     },
@@ -239,17 +266,13 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     },
     downloadSpeechModel: downloadSpeech,
     cancelSpeechModelDownload: async () => {
-      const transfer = speechTransfer;
-      if (!transfer) return speechStatus();
-      speechTransfer = null;
-      setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
-      transfer.settle(speechStatus());
+      stopSpeechTransfer();
       return speechStatus();
     },
     removeSpeechModel: async () => {
-      speechTransfer?.settle({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
-      speechTransfer = null;
-      setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
+      stopSpeechTransfer();
+      const { modelId } = speechSettings;
+      if (modelId === SPEECH_MODEL_ID || modelId === KOKORO_SPEECH_MODEL.id) setSpeechStatus(modelId, "missing", null);
       return speechStatus();
     },
     // Silence of about the length the text would take to read.

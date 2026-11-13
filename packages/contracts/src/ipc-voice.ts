@@ -365,7 +365,12 @@ export function modelLanguage(model: VoiceModelInfo, language: VoiceLanguage): V
  * named in model statuses; never rename it.
  */
 export const SPEECH_MODEL_ID = "supertonic-3";
-export type LocalSpeechModelId = typeof SPEECH_MODEL_ID;
+export const KOKORO_SPEECH_MODEL = {
+  id: "kokoro-v1.1-zh",
+  name: "Kokoro v1.1 (ZH)",
+  bytes: 177_111_060,
+} as const;
+export type LocalSpeechModelId = typeof SPEECH_MODEL_ID | typeof KOKORO_SPEECH_MODEL.id;
 
 /** The providers that read replies aloud with the user's own API key. */
 export const SPEECH_KEY_PROVIDERS = ["elevenlabs", "xai"] as const;
@@ -400,7 +405,7 @@ export const CLOUD_SPEECH_MODEL_IDS = [
 export type CloudSpeechModelId = (typeof CLOUD_SPEECH_MODEL_IDS)[number];
 
 /** Every model that reads replies aloud, Supertonic first. */
-export const SPEECH_MODEL_IDS = [SPEECH_MODEL_ID, ...CLOUD_SPEECH_MODEL_IDS] as const;
+export const SPEECH_MODEL_IDS = [SPEECH_MODEL_ID, KOKORO_SPEECH_MODEL.id, ...CLOUD_SPEECH_MODEL_IDS] as const;
 export type SpeechModelId = (typeof SPEECH_MODEL_IDS)[number];
 
 export interface CloudSpeechModelInfo {
@@ -419,7 +424,7 @@ export const CLOUD_SPEECH_MODELS: readonly CloudSpeechModelInfo[] = [
   { id: "xai-tts", provider: "xai", name: "Text to Speech" },
 ];
 
-/** The cloud model of an ID, or undefined for Supertonic. */
+/** The cloud model of an ID, or undefined for a local model. */
 export function cloudSpeechModel(id: SpeechModelId): CloudSpeechModelInfo | undefined {
   return CLOUD_SPEECH_MODELS.find((model) => model.id === id);
 }
@@ -513,6 +518,10 @@ export interface SpeechSettings {
    * each spoken request to the agent's own provider.
    */
   codexLive: boolean;
+  /** Selects MOSS Live for desktop voice conversations. */
+  mossLive?: boolean;
+  /** The MOSS Live voice. Null or absent lets MOSS choose. */
+  mossLiveVoice?: MossLiveVoice | null;
   /** The voice of Codex live voice. Null lets OpenAI choose. */
   codexLiveVoice: CodexLiveVoice | null;
 }
@@ -561,6 +570,9 @@ export const CODEX_LIVE_VOICES = [
 ] as const;
 export type CodexLiveVoice = (typeof CODEX_LIVE_VOICES)[number];
 
+export const MOSS_LIVE_VOICES = ["nuannuan", "mumu"] as const;
+export type MossLiveVoice = (typeof MOSS_LIVE_VOICES)[number];
+
 /**
  * The start of a Codex live voice session. `sdp` is the WebRTC offer of the renderer's peer
  * connection: one audio track and the `oai-events` data channel.
@@ -579,6 +591,19 @@ export interface VoiceLiveSession {
 export interface VoiceLiveStop {
   sessionId: string;
 }
+
+export type MossLiveControl =
+  | { action: "mic"; enabled: boolean }
+  | { action: "played" | "stopped" | "completed"; runId: string; turnId: string; chunkId?: string; playedMs?: number }
+  | { action: "answer"; callId: string; text: string };
+
+export type MossLiveEvent =
+  | { type: "transcript"; role: "user" | "assistant"; text: string }
+  | { type: "audio"; pcm: Uint8Array; runId: string; turnId: string; chunkId: string }
+  | { type: "stop" | "done"; runId: string; turnId: string }
+  | { type: "request"; callId: string; text: string }
+  | { type: "cancel"; callId: string }
+  | { type: "ended"; error: string };
 
 /**
  * What a live voice session sends while it runs. A transcript part with `final: false` is new text
@@ -612,7 +637,8 @@ export const SPEECH_LIMITS = {
 /** One part of a reply to read aloud, in one language. */
 export interface SpeechInput {
   text: string;
-  language: SpeechLanguage;
+  /** Chinese uses a system voice on Windows or the user's configured speech provider. */
+  language: SpeechLanguage | "zh";
 }
 
 /** The speech of one `SpeechInput`: little-endian 16-bit mono PCM. */
@@ -643,6 +669,10 @@ export function isXaiSpeechVoice(value: unknown): value is XaiSpeechVoice {
 
 export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {
   return isOneOf(CODEX_LIVE_VOICES, value);
+}
+
+export function isMossLiveVoice(value: unknown): value is MossLiveVoice {
+  return isOneOf(MOSS_LIVE_VOICES, value);
 }
 
 export function isSpeechSpeed(value: unknown): value is SpeechSpeed {

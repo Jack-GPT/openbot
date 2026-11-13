@@ -143,8 +143,8 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.voice.speech.voice.title" },
       { titleKey: "settings.voice.speech.speed.title" },
       {
-        titleKey: "settings.voice.speech.codexLive.title",
-        descriptionKey: "settings.voice.speech.codexLive.description",
+        titleKey: "settings.voice.live.section",
+        descriptionKey: "settings.voice.live.provider",
       },
     ],
   },

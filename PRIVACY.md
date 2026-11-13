@@ -1088,6 +1088,11 @@ Network traffic can also occur when:
   `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
   conversation, file or agent instruction. Groq handles the audio and the text under its own policy
   and the user's Groq plan;
+- when the user enables **MOSS Live** in **Settings → Voice**, the desktop app sends live microphone
+  audio to MOSS (`api.mosi.cn`) and receives audio and transcripts. When MOSS requests an OpenBot
+  agent task, the app sends that request to the current agent and returns the agent's answer to MOSS.
+  The API key is encrypted with the operating system's credential storage and stays in the desktop
+  main process. Closing the voice conversation stops the audio stream;
 - the user sets up a voice server in **Settings → Voice**. OpenBot sends requests only to the address
   that the user enters, with the user's API key when there is one. To connect, it lists the server's
   models and voices. When the server does dictation, OpenBot sends the recorded audio, the chosen

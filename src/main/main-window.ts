@@ -70,7 +70,14 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
-import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
+import {
+  followAppearance,
+  followWindowGlass,
+  glassWindowOptions,
+  setWorkspaceWindowZoom,
+  windowBackgroundColor,
+  windowsTitleBarOptions,
+} from "./window-appearance";
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
@@ -245,6 +252,7 @@ export function createMainWindowController({
       minHeight: 640,
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
+      ...windowsTitleBarOptions(),
       title:
         developmentProfile === "test-client"
           ? getTranslate()("window.localClientTitle")
@@ -312,7 +320,7 @@ export function createMainWindowController({
     // size is applied on each navigation rather than once when the window is made.
     window.webContents.on("did-navigate", () => {
       const interfaceSize = getServices()?.interfaceSize;
-      if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
+      if (interfaceSize) setWorkspaceWindowZoom(window, interfaceSize.zoomFactor);
     });
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
@@ -395,6 +403,7 @@ export function createMainWindowController({
       minHeight: 480,
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
+      ...windowsTitleBarOptions(),
       // The page sets the chat name as its title when it loads.
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
@@ -428,7 +437,7 @@ export function createMainWindowController({
     });
     window.webContents.on("did-navigate", () => {
       const interfaceSize = getServices()?.interfaceSize;
-      if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
+      if (interfaceSize) setWorkspaceWindowZoom(window, interfaceSize.zoomFactor);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
     followWindowButtonSide(window, getLayoutDirection);

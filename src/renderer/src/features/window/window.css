@@ -1177,6 +1177,69 @@
   padding-inline-start: 76px;
 }
 
+/* The overlay reports the usable part of the title bar in CSS pixels. Keep the controls in the
+ * top row and reserve the remaining space there, including after an interface zoom change. */
+:root {
+  --window-controls-left: env(titlebar-area-x, 0px);
+  --window-controls-right: max(
+    0px,
+    calc((100vw - var(--window-controls-left) - env(titlebar-area-width, 100vw)) * sign(env(titlebar-area-height, 0px)))
+  );
+  --window-controls-end: var(--window-controls-right);
+}
+
+:root:dir(rtl) {
+  --window-controls-end: var(--window-controls-left);
+}
+
+/* Agent settings loads separately. Keep the header in its column while the pane loads. */
+.app-window .side-panel-docked:not(.browser-panel-active, [data-settings-panel]) > .conversation-header {
+  width: calc(100% - var(--side-panel-width));
+}
+
+.app-window .conversation-panel:not(.side-panel-docked) > .conversation-header {
+  padding-inline-end: calc(12px + var(--window-controls-end));
+}
+
+.app-window .side-panel-header {
+  padding-inline-end: calc(var(--openbot-space-2) + var(--window-controls-end));
+}
+
+.app-window .direct-conversation-header {
+  padding-inline-end: calc(14px + var(--window-controls-end));
+}
+
+.app-window > .app-frame-edge .page-header,
+.app-window .tasks-page-header,
+.app-window .first-agent-setup-header,
+.app-window .diagram-view-header {
+  padding-inline-end: calc(var(--openbot-space-3) + var(--window-controls-end));
+}
+
+.app-window > .app-frame-edge > .window-page .skills-marketplace-topbar {
+  padding-inline-end: var(--window-controls-end);
+}
+
+.app-window .settings-page-close {
+  margin-inline-end: calc(var(--openbot-space-3) + var(--window-controls-end));
+}
+
+.app-window .settings-page-path-row {
+  padding-inline-end: calc(var(--openbot-space-8) + var(--openbot-space-4) + var(--window-controls-end));
+}
+
+.app-window .wfn-canvas[data-frame="window"] .wfn-hud-top {
+  inset-inline-end: calc(var(--openbot-space-3) + var(--window-controls-end));
+}
+
+.remote-desktop-header {
+  padding-inline-end: calc(8px + var(--window-controls-end));
+}
+
+.browser-full-top {
+  padding-inline-end: var(--window-controls-end);
+}
+
 /* The hint that one press of Cmd + Q does not quit. The window behind it is dimmed and blurred, as
  * behind a dialog, so the hint is clear on every page. It is over every page and dialog of the page.
  * A browser tab is a native view, so the conversation hides it while the hint shows. A click goes

@@ -75,6 +75,7 @@ import {
   isApprovalAutomationPreference,
   isAppThemePalette,
   isAppThemePaletteId,
+  isAppWindowMaterial,
   isAutomationRunsPerHour,
   isAvatarColor,
   isBusyMessageMode,
@@ -90,6 +91,7 @@ import {
   isDetectedModelServer,
   isDiscoverModelsResult,
   isElevenLabsSpeechVoice,
+  isMossLiveVoice,
   isPlanStartAfterMs,
   isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
@@ -102,11 +104,13 @@ import {
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isWindowTransparency,
   isXaiSpeechVoice,
   type LinkAccountStatus,
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
+  type MossLiveEvent,
   type NotificationOpenedEvent,
   type NotificationPreference,
   type OnePasswordConnectorStatus,
@@ -280,12 +284,18 @@ export function decodeAppAppearancePreference(value: unknown): AppAppearancePref
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
   if (typeof preference.transparentWindow !== "boolean") throw new Error("Invalid transparent window.");
+  const { windowMaterial, windowTransparency } = preference;
+  if (windowMaterial !== undefined && !isAppWindowMaterial(windowMaterial)) throw new Error("Invalid window material.");
+  if (windowTransparency !== undefined && !isWindowTransparency(windowTransparency))
+    throw new Error("Invalid window transparency.");
   if (preference.palette !== null && !isAppThemePaletteId(preference.palette))
     throw new Error("Invalid theme palette.");
   const palettes = decodeList(preference.palettes, "theme palettes", decodeThemePalette);
   return {
     appearance: preference.appearance,
     transparentWindow: preference.transparentWindow,
+    ...(windowMaterial === undefined ? {} : { windowMaterial }),
+    ...(windowTransparency === undefined ? {} : { windowTransparency }),
     palette: preference.palette,
     palettes,
     chatBackgroundLight: decodeChatBackground(preference.chatBackgroundLight),
@@ -593,13 +603,14 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice } = settings;
+  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice, mossLiveVoice } = settings;
   if (
     !isSpeechModelId(modelId) ||
     !isSpeechVoice(voice) ||
     !isElevenLabsSpeechVoice(elevenLabsVoice) ||
     !isXaiSpeechVoice(xaiVoice) ||
     !isSpeechSpeed(speed) ||
+    (mossLiveVoice != null && !isMossLiveVoice(mossLiveVoice)) ||
     !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice))
   )
     throw new Error("Invalid speech settings.");
@@ -611,8 +622,40 @@ export function decodeSpeechSettings(value: unknown): SpeechSettings {
     xaiVoice,
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),
+    ...(settings.mossLive === undefined ? {} : { mossLive: requiredBoolean(settings, "mossLive") }),
+    ...(mossLiveVoice != null ? { mossLiveVoice } : {}),
     codexLiveVoice,
   };
+}
+
+export function decodeMossLiveEvent(value: unknown): MossLiveEvent {
+  const e = decodeRecord(value, "MOSS live event");
+  switch (e.type) {
+    case "ended":
+      return { type: e.type, error: requiredString(e, "error") };
+    case "transcript":
+      if (e.role === "user" || e.role === "assistant")
+        return { type: e.type, role: e.role, text: requiredString(e, "text") };
+      break;
+    case "request":
+      return { type: e.type, callId: requiredString(e, "callId"), text: requiredString(e, "text") };
+    case "cancel":
+      return { type: e.type, callId: requiredString(e, "callId") };
+    case "done":
+    case "stop":
+      return { type: e.type, runId: requiredString(e, "runId"), turnId: requiredString(e, "turnId") };
+    case "audio": {
+      const { pcm } = decodeSpeechAudio({ pcm: e.pcm, sampleRate: 48_000 });
+      return {
+        type: e.type,
+        pcm,
+        runId: requiredString(e, "runId"),
+        turnId: requiredString(e, "turnId"),
+        chunkId: requiredString(e, "chunkId"),
+      };
+    }
+  }
+  throw new Error("Invalid MOSS live event.");
 }
 
 export function decodeVoiceLiveSession(value: unknown): VoiceLiveSession {

@@ -16,8 +16,20 @@ export type AppAppearance = (typeof APP_APPEARANCES)[number];
 /** Dark: OpenBot was dark only before this choice existed, so an update does not change the look. */
 export const DEFAULT_APP_APPEARANCE: AppAppearance = "dark";
 
-/** Off: a see-through window is a choice, and only macOS can blur what is behind it. */
 export const DEFAULT_TRANSPARENT_WINDOW = false;
+
+export const APP_WINDOW_MATERIALS = ["solid", "mica", "acrylic"] as const;
+export type AppWindowMaterial = (typeof APP_WINDOW_MATERIALS)[number];
+export const DEFAULT_WINDOW_TRANSPARENCY = 50;
+export const MAX_WINDOW_TRANSPARENCY = 75;
+
+export function isAppWindowMaterial(value: unknown): value is AppWindowMaterial {
+  return APP_WINDOW_MATERIALS.some((material) => material === value);
+}
+
+export function isWindowTransparency(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_WINDOW_TRANSPARENCY;
+}
 
 /**
  * The colors that a theme palette file gives. Each is a `#rrggbb` or `#rrggbbaa` hex color. The
@@ -101,13 +113,12 @@ export interface AppAppearancePreference {
   palette: string | null;
   /** Every valid palette file, by id. Empty on most computers. */
   palettes: AppThemePalette[];
-  /**
-   * The main window shows the blurred desktop behind it (macOS vibrancy). Main reports `false` on
-   * other platforms. While it is on, main sets `nativeTheme.themeSource` to the appearance, because the
-   * blur takes its light or dark shade from it: then visited websites and native menus follow the
-   * appearance too.
-   */
+  /** The workspace uses a translucent backdrop. Settings writes this switch on macOS. */
   transparentWindow: boolean;
+  /** The saved backdrop on Windows. Omitted when the OS cannot apply it. */
+  windowMaterial?: AppWindowMaterial;
+  /** The strength of the transparency on surfaces above the backdrop, as a percentage. */
+  windowTransparency?: number;
   /** See `ChatBackgroundColor`. Each scheme has its own field, so a change to one keeps the other. */
   chatBackgroundLight: ChatBackgroundColor | null;
   chatBackgroundDark: ChatBackgroundColor | null;
@@ -126,6 +137,8 @@ export type SetAppAppearancePreferenceInput = Partial<
     AppAppearancePreference,
     | "appearance"
     | "transparentWindow"
+    | "windowMaterial"
+    | "windowTransparency"
     | "palette"
     | "chatBackgroundLight"
     | "chatBackgroundDark"

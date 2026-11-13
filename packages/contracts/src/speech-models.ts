@@ -205,3 +205,107 @@ export const SUPERTONIC_MODEL_FILES: readonly SpeechModelFile[] = [
 
 /** More denoising steps sound cleaner and take longer. Desktop and the phone use the same value. */
 export const SUPERTONIC_DENOISING_STEPS = 8;
+
+const KOKORO_REVISION = "1355334be009ccce397060ee639a874137a128fa";
+const KOKORO_BASE_URL = `https://huggingface.co/csukuangfj/kokoro-int8-multi-lang-v1_1/resolve/${KOKORO_REVISION}`;
+export const KOKORO_MODEL_DIRECTORY = "kokoro-int8-v1.1-zh";
+
+/** Kokoro v1.1-zh ONNX export for sherpa-onnx. The Apache 2.0 notice stays with the model. */
+export const KOKORO_MODEL_FILES: readonly SpeechModelFile[] = [
+  {
+    name: "model.int8.onnx",
+    url: `${KOKORO_BASE_URL}/model.int8.onnx`,
+    bytes: 114_203_914,
+    sha256: "05d793700b0b507f760c183c0e39bdd6a97b43d32fdc7bf7b54a5179f1b11222",
+  },
+  {
+    name: "voices.bin",
+    url: `${KOKORO_BASE_URL}/voices.bin`,
+    bytes: 53_790_720,
+    sha256: "e64a5a581d8c2a350d848f51c3121657cd83aa07ed6109172177345874a7244c",
+  },
+  {
+    name: "tokens.txt",
+    url: `${KOKORO_BASE_URL}/tokens.txt`,
+    bytes: 1_111,
+    sha256: "931ab2df2400cd65d580a22402024c2347ced8ae9ea300e545144b1aacc48e14",
+  },
+  {
+    name: "lexicon-us-en.txt",
+    url: `${KOKORO_BASE_URL}/lexicon-us-en.txt`,
+    bytes: 5_956_885,
+    sha256: "7daaab53a181be9885b853a8582bf1838186317e5dadacbcef9c426d6fa0da14",
+  },
+  {
+    name: "lexicon-zh.txt",
+    url: `${KOKORO_BASE_URL}/lexicon-zh.txt`,
+    bytes: 2_120_131,
+    sha256: "fea060803db3e59193987f1a3436f56917bda09f3b3595b6588e46ae60cebf93",
+  },
+  {
+    name: "LICENSE",
+    url: `${KOKORO_BASE_URL}/LICENSE`,
+    bytes: 11_358,
+    sha256: "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  },
+  {
+    name: "date-zh.fst",
+    url: `${KOKORO_BASE_URL}/date-zh.fst`,
+    bytes: 59_154,
+    sha256: "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718",
+  },
+  {
+    name: "number-zh.fst",
+    url: `${KOKORO_BASE_URL}/number-zh.fst`,
+    bytes: 64_482,
+    sha256: "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd",
+  },
+  {
+    name: "phone-zh.fst",
+    url: `${KOKORO_BASE_URL}/phone-zh.fst`,
+    bytes: 88_630,
+    sha256: "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7",
+  },
+  {
+    name: "espeak-ng-data/en_dict",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/en_dict`,
+    bytes: 166_944,
+    sha256: "71bd330ba8a2e3e8076e631508208ef49449d6147c17b7bd2b4b1e1468292e35",
+  },
+  {
+    name: "espeak-ng-data/phondata",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/phondata`,
+    bytes: 550_424,
+    sha256: "4e0288957874029a8c3c9f41a8f517ad4bf18127046decbdd4b9d1d6807ce3a3",
+  },
+  {
+    name: "espeak-ng-data/phontab",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/phontab`,
+    bytes: 55_796,
+    sha256: "886f3fa402cb0ba73d483aa8ad000af47a6b7cc06293c75a97913fba68a530f6",
+  },
+  {
+    name: "espeak-ng-data/phonindex",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/phonindex`,
+    bytes: 39_074,
+    sha256: "3ca7b8fa3b42624e4b0f152707e7a39245fce569aa99ea47c055d9e622fcf0c4",
+  },
+  {
+    name: "espeak-ng-data/intonations",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/intonations`,
+    bytes: 2_040,
+    sha256: "3f8af65fd3eda9759a10f021d61361c120871f463515229c925995c7f90918cc",
+  },
+  {
+    name: "espeak-ng-data/lang/gmw/en",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/lang/gmw/en`,
+    bytes: 140,
+    sha256: "4605d5330801de3641c6e366d15f129ea1f5ffbce8722642aba01ace07ab9c83",
+  },
+  {
+    name: "espeak-ng-data/lang/gmw/en-US",
+    url: `${KOKORO_BASE_URL}/espeak-ng-data/lang/gmw/en-US`,
+    bytes: 257,
+    sha256: "41534c2a22df5dd4f1052ff9e1a33a3ea7bff5a26b5c02bdad5ba8ddb7524704",
+  },
+];

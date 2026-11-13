@@ -35,6 +35,7 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI סירבה להפעיל קול חי. יש לנסות שוב מאוחר יותר, או לכבות את הקול החי בהגדרות כדי לדבר בקול.",
   "error.voice.live.off": "הקול החי של Codex כבוי. אפשר להפעיל אותו בהגדרות ← קול.",
+  "error.voice.moss.failed": "החיבור ל־MOSS Live נכשל. יש לבדוק את מפתח ה־API ולנסות שוב.",
   // The user's own voice server.
   "error.voice.server.routeOff": "שרת הקול לא הוגדר לכך. יש לבדוק את הגדרות ← קול.",
   "error.voice.server.keyRefused": "{host} דחה את מפתח ה-API.",

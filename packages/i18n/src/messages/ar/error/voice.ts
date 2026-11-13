@@ -34,6 +34,7 @@ export const messages = {
   "error.voice.live.refused":
     "رفضت OpenAI بدء الصوت المباشر. حاول مرة أخرى لاحقًا، أو أوقف الصوت المباشر من الإعدادات للتحدث بالصوت.",
   "error.voice.live.off": "صوت Codex المباشر متوقف. شغّله من الإعدادات ← الصوت.",
+  "error.voice.moss.failed": "تعذر الاتصال بـ MOSS Live. تحقق من مفتاح API وحاول مرة أخرى.",
   "error.voice.server.routeOff": "خادم الصوت غير مُعدّ لهذا. تحقّق من الإعدادات → الصوت.",
   "error.voice.server.keyRefused": "رفض {host} مفتاح API.",
   "error.voice.server.invalidAnswer": "لم يرسل {host} ردًا متوافقًا مع OpenAI.",

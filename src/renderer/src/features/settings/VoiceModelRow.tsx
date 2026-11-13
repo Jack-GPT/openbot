@@ -190,7 +190,7 @@ function modelFullName(choice: ModelChoice<string> | undefined): string {
 }
 
 interface VoiceKeyRowProps {
-  provider: VoiceKeyProvider;
+  provider: VoiceKeyProvider | "moss";
   saved: boolean;
   /** Saves the key. The answer is false when main could not save it. */
   onSave: (key: string) => Promise<boolean>;
@@ -205,7 +205,7 @@ interface VoiceKeyRowProps {
 export function VoiceKeyRow(props: VoiceKeyRowProps) {
   const { t } = useText();
   const [key, setKey] = createStore({ draft: "", saving: false });
-  const provider = () => VOICE_KEY_PROVIDER_NAMES[props.provider];
+  const provider = () => (props.provider === "moss" ? "MOSS" : VOICE_KEY_PROVIDER_NAMES[props.provider]);
   const label = () => t("settings.voice.apiKey.providerLabel", { provider: provider() });
   const save = async () => {
     const draft = key.draft.trim();

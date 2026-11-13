@@ -14,6 +14,7 @@ export interface ConversationPort {
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
     | "onScopedEvent"
+    | "listQueue"
     | "deleteConversationMessage"
     | "deleteTable"
     | "listMemories"

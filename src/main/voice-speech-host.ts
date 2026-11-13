@@ -1,4 +1,4 @@
-// The process that reads replies aloud with Supertonic 3 through sherpa-onnx.
+// The process that reads replies aloud with sherpa-onnx.
 //
 // It is separate from the main process because a synthesis cannot be interrupted, and separate from
 // the transcription host so that dictation does not wait behind speech. The main process ends this
@@ -26,7 +26,7 @@ const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
 /** The part of the sherpa-onnx offline TTS configuration that OpenBot sets. */
 interface TtsConfig {
   model: {
-    supertonic: {
+    supertonic?: {
       durationPredictor: string;
       textEncoder: string;
       vectorEstimator: string;
@@ -35,12 +35,20 @@ interface TtsConfig {
       unicodeIndexer: string;
       voiceStyle: string;
     };
+    kokoro?: {
+      model: string;
+      voices: string;
+      tokens: string;
+      dataDir: string;
+      lexicon: string;
+    };
     numThreads: number;
     /** `cpu`, or `cpu:<file>` with ONNX Runtime session settings. */
     provider: string;
     debug: number;
   };
   maxNumSentences: number;
+  ruleFsts?: string;
 }
 
 interface GenerationRequest {
@@ -122,8 +130,29 @@ function providerFor(addonPath: string, sessionConfig: string): string {
 
 function ttsConfig(request: VoiceSpeechRequest): TtsConfig {
   const file = (name: string) => join(request.modelDirectory, name);
+  const runtime = {
+    numThreads: request.numThreads,
+    provider: providerFor(request.addonPath, request.sessionConfig),
+    debug: 0,
+  };
+  if (request.kokoro)
+    return {
+      model: {
+        ...runtime,
+        kokoro: {
+          model: file("model.int8.onnx"),
+          voices: file("voices.bin"),
+          tokens: file("tokens.txt"),
+          dataDir: file("espeak-ng-data"),
+          lexicon: [file("lexicon-us-en.txt"), file("lexicon-zh.txt")].join(","),
+        },
+      },
+      maxNumSentences: 1,
+      ruleFsts: [file("date-zh.fst"), file("number-zh.fst"), file("phone-zh.fst")].join(","),
+    };
   return {
     model: {
+      ...runtime,
       supertonic: {
         durationPredictor: file("duration_predictor.int8.onnx"),
         textEncoder: file("text_encoder.int8.onnx"),
@@ -133,9 +162,6 @@ function ttsConfig(request: VoiceSpeechRequest): TtsConfig {
         unicodeIndexer: file("unicode_indexer.bin"),
         voiceStyle: file("voice.bin"),
       },
-      numThreads: request.numThreads,
-      provider: providerFor(request.addonPath, request.sessionConfig),
-      debug: 0,
     },
     maxNumSentences: 1,
   };
@@ -201,6 +227,7 @@ function isRequest(value: unknown): value is VoiceSpeechRequest {
     typeof value.addonPath === "string" &&
     "modelDirectory" in value &&
     typeof value.modelDirectory === "string" &&
+    (!("kokoro" in value) || value.kokoro === true) &&
     "text" in value &&
     typeof value.text === "string" &&
     "language" in value &&

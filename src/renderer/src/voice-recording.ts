@@ -69,7 +69,7 @@ function mixToMono(audio: AudioBuffer): Float32Array {
   return mono;
 }
 
-function resample(input: Float32Array, sourceRate: number, targetRate: number): Float32Array {
+export function resample(input: Float32Array, sourceRate: number, targetRate: number): Float32Array {
   if (sourceRate === targetRate) return input;
   const output = new Float32Array(Math.floor((input.length * targetRate) / sourceRate));
   const ratio = sourceRate / targetRate;

@@ -168,12 +168,14 @@ export class AcpConnection {
     this: AcpConnection,
     argv: readonly string[],
     timeoutMs: number,
+    cwd?: string,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     yield* Effect.tryPromise({
       try: (signal) => {
         const direct = cliSpawnTarget(this.options.cli.executable, argv);
         const target = this.options.confine ? this.options.confine(direct) : direct;
         return execFileAsync(target.command, target.args, {
+          cwd,
           signal,
           timeout: timeoutMs,
           maxBuffer: 64 * 1024,

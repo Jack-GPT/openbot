@@ -17,6 +17,13 @@ export const messages = {
   "settings.appearance.transparentWindow.title": "Fenêtre transparente",
   "settings.appearance.transparentWindow.description":
     "Affiche le bureau flouté derrière la fenêtre. Les sites et les menus suivent alors le thème de l’app.",
+  "settings.appearance.windowMaterial.title": "Matériau de la fenêtre",
+  "settings.appearance.windowMaterial.description":
+    "Applique un effet à l’espace de travail et aux fonds de discussion.",
+  "settings.appearance.windowMaterial.solid": "Opaque",
+  "settings.appearance.windowMaterial.mica": "Verre dépoli (Mica)",
+  "settings.appearance.windowMaterial.acrylic": "Acrylique",
+  "settings.appearance.windowTransparency.title": "Transparence",
   "settings.interfaceSize.title": "Taille de l’interface",
   "settings.interfaceSize.description": "La taille du texte et des commandes dans OpenBot.",
   "settings.interfaceFont.title": "Police de l’interface",
@@ -684,6 +691,8 @@ export const messages = {
   "settings.voice.apiKey.removeFailed": "Impossible de supprimer la clé API. Réessayez.",
   "settings.voice.speech.section": "Réponses parlées",
   "settings.voice.speech.model.description": "Lit les réponses à voix haute sur cet ordinateur, en 31 langues.",
+  "settings.voice.speech.model.kokoro.description": "Lit le chinois et l’anglais à voix haute sur cet ordinateur.",
+  "settings.voice.speech.model.kokoro.sample": "你好，今天过得怎么样？别着急，我们可以慢慢聊。",
   "settings.voice.speech.readReplies.title": "Lire les réponses à voix haute",
   "settings.voice.speech.readReplies.description":
     "Quand vous dictez un message, la réponse est lue à voix haute. Dictez à nouveau pour l’arrêter.",
@@ -701,6 +710,13 @@ export const messages = {
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
   "settings.voice.live.section": "Voix en direct",
+  "settings.voice.live.provider": "Fournisseur",
+  "settings.voice.live.moss.title": "MOSS Live",
+  "settings.voice.live.moss.description":
+    "Envoie le son du microphone et les réponses de l’agent à MOSS pendant la conversation vocale.",
+  "settings.voice.live.moss.voice.default": "Par défaut",
+  "settings.voice.live.moss.voice.nuannuan": "Nuannuan",
+  "settings.voice.live.moss.voice.mumu": "Mumu",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":

@@ -2,13 +2,16 @@ import {
   type AppAppearancePreference,
   type AppFontFamily,
   type AppThemePalette,
+  type AppWindowMaterial,
   type ChatBackgroundColor,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
+  DEFAULT_WINDOW_TRANSPARENCY,
   isAppAppearance,
   isAppFontFamily,
   isAppThemePalette,
   isChatBackgroundColor,
+  isWindowTransparency,
   sameThemePalettes,
   selectedThemePalette,
 } from "@openbot/contracts/app-appearance";
@@ -26,7 +29,7 @@ import { applyThemePalette } from "./theme-palette";
 import { sweepTheme } from "./theme-sweep";
 
 /** One Settings control's value. Set optimistically, and reverted if main refuses the write. */
-function optimisticChoice<T extends string | boolean | null>(initial: T, save: (next: T) => Promise<T>) {
+function optimisticChoice<T extends string | boolean | number | null>(initial: T, save: (next: T) => Promise<T>) {
   const [value, setValue] = createSignal<T>(() => initial);
   let confirmed = initial;
   let latestRequest = 0;
@@ -73,6 +76,16 @@ export function useAppearanceChoice() {
       .setAppAppearancePreference({ transparentWindow: next })
       .then((preference) => preference.transparentWindow),
   );
+  const windowMaterial = optimisticChoice<AppWindowMaterial | null>(null, (next) =>
+    appPort()
+      .setAppAppearancePreference({ windowMaterial: next ?? "solid" })
+      .then((preference) => preference.windowMaterial ?? null),
+  );
+  const windowTransparency = optimisticChoice<number>(DEFAULT_WINDOW_TRANSPARENCY, (next) =>
+    appPort()
+      .setAppAppearancePreference({ windowTransparency: next })
+      .then((preference) => preference.windowTransparency ?? DEFAULT_WINDOW_TRANSPARENCY),
+  );
   const chatBackgroundLight = optimisticChoice<ChatBackgroundColor | null>(null, (next) =>
     appPort()
       .setAppAppearancePreference({ chatBackgroundLight: next })
@@ -97,6 +110,8 @@ export function useAppearanceChoice() {
     setPalettes(() => preference.palettes);
     theme.confirm(appearanceSelectValue(preference));
     transparentWindow.confirm(preference.transparentWindow);
+    windowMaterial.confirm(preference.windowMaterial ?? null);
+    windowTransparency.confirm(preference.windowTransparency ?? DEFAULT_WINDOW_TRANSPARENCY);
     chatBackgroundLight.confirm(preference.chatBackgroundLight);
     chatBackgroundDark.confirm(preference.chatBackgroundDark);
     interfaceFont.confirm(preference.interfaceFont);
@@ -117,6 +132,10 @@ export function useAppearanceChoice() {
     palettes,
     transparentWindow: transparentWindow.value,
     changeTransparentWindow: transparentWindow.change,
+    windowMaterial: windowMaterial.value,
+    changeWindowMaterial: windowMaterial.change,
+    windowTransparency: windowTransparency.value,
+    changeWindowTransparency: windowTransparency.change,
     chatBackgroundLight: chatBackgroundLight.value,
     changeChatBackgroundLight: chatBackgroundLight.change,
     chatBackgroundDark: chatBackgroundDark.value,
@@ -131,6 +150,7 @@ export function useAppearanceChoice() {
 /** This window's copy of the choice, so the first paint after a launch has the saved colors. */
 const CACHED_APPEARANCE_KEY = "openbot.appearance";
 const CACHED_TRANSPARENT_WINDOW_KEY = "openbot.transparentWindow";
+const CACHED_WINDOW_TRANSPARENCY_KEY = "openbot.windowTransparency";
 /** The selected palette whole, so the first paint has its colors before main answers. */
 const CACHED_THEME_PALETTE_KEY = "openbot.themePalette";
 const CACHED_CHAT_BACKGROUND_LIGHT_KEY = "openbot.chatBackgroundLight";
@@ -173,10 +193,13 @@ function cachedPalette(): AppThemePalette | null {
 function cachedPreference(): AppAppearancePreference {
   try {
     const appearance = window.localStorage.getItem(CACHED_APPEARANCE_KEY);
+    const savedTransparency = window.localStorage.getItem(CACHED_WINDOW_TRANSPARENCY_KEY);
+    const transparency = savedTransparency === null ? DEFAULT_WINDOW_TRANSPARENCY : Number(savedTransparency);
     const palette = cachedPalette();
     return {
       appearance: isAppAppearance(appearance) ? appearance : DEFAULT_APP_APPEARANCE,
       transparentWindow: window.localStorage.getItem(CACHED_TRANSPARENT_WINDOW_KEY) === "true",
+      windowTransparency: isWindowTransparency(transparency) ? transparency : DEFAULT_WINDOW_TRANSPARENCY,
       palette: palette === null ? null : palette.id,
       palettes: palette === null ? [] : [palette],
       chatBackgroundLight: cachedChatBackground(CACHED_CHAT_BACKGROUND_LIGHT_KEY),
@@ -202,6 +225,10 @@ function cachePreference(preference: AppAppearancePreference): void {
   try {
     window.localStorage.setItem(CACHED_APPEARANCE_KEY, preference.appearance);
     window.localStorage.setItem(CACHED_TRANSPARENT_WINDOW_KEY, String(preference.transparentWindow));
+    window.localStorage.setItem(
+      CACHED_WINDOW_TRANSPARENCY_KEY,
+      String(preference.windowTransparency ?? DEFAULT_WINDOW_TRANSPARENCY),
+    );
     const palette = selectedThemePalette(preference);
     if (palette === null) window.localStorage.removeItem(CACHED_THEME_PALETTE_KEY);
     else window.localStorage.setItem(CACHED_THEME_PALETTE_KEY, JSON.stringify(palette));
@@ -221,8 +248,7 @@ function cachePreference(preference: AppAppearancePreference): void {
  * background of each scheme goes over both, in conversations only. The chosen fonts go before the
  * default fonts.
  *
- * Only the main window passes `windowGlass`: main gives the macOS blur to that window alone, so in
- * another window a transparent page would show the desktop with no blur.
+ * Workspace and chat windows pass `windowGlass` so their surfaces show the native backdrop.
  *
  * A helper window, such as the agent dock or the browser dock, passes `sweep: false` and changes the
  * theme at once: a wash across its transparent window does not align with the main window.
@@ -234,8 +260,13 @@ export function syncAppearance(options: { windowGlass?: boolean; sweep?: boolean
   applyChatBackground(preference);
   applyAppFonts(preference);
   const showGlass = () => {
-    if (options.windowGlass)
-      document.documentElement.toggleAttribute("data-openbot-window-glass", preference.transparentWindow);
+    if (!options.windowGlass) return;
+    const root = document.documentElement;
+    root.toggleAttribute("data-openbot-window-glass", preference.transparentWindow);
+    root.style.setProperty(
+      "--window-transparency",
+      String((preference.windowTransparency ?? DEFAULT_WINDOW_TRANSPARENCY) / 100),
+    );
   };
   showGlass();
   const apply = (next: AppAppearancePreference) => {

@@ -1,8 +1,11 @@
 import {
   APP_INTERFACE_SIZES,
+  APP_WINDOW_MATERIALS,
   type AppInterfaceSize,
   type AppVariant,
+  type AppWindowMaterial,
   type AvatarColor,
+  MAX_WINDOW_TRANSPARENCY,
   QUIT_GUARDS,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
@@ -20,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   SettingsSection,
+  SliderField,
   SwitchField,
   toast,
 } from "@openbot/ui";
@@ -34,7 +38,7 @@ import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { useText } from "@openbot/ui/text";
-import { createUniqueId, Show } from "solid-js";
+import { createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { useInstalledFonts } from "../../app-fonts";
 import { useAppearanceChoice } from "../../appearance-choice";
 import { useI18n } from "../../i18n-context";
@@ -44,6 +48,12 @@ import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
+const windowMaterialOptions = [...APP_WINDOW_MATERIALS];
+const WINDOW_MATERIAL_LABEL = {
+  solid: "settings.appearance.windowMaterial.solid",
+  mica: "settings.appearance.windowMaterial.mica",
+  acrylic: "settings.appearance.windowMaterial.acrylic",
+} as const satisfies Record<AppWindowMaterial, AppTextKey>;
 const quitGuardOptions = [...QUIT_GUARDS];
 const QUIT_GUARD_LABEL = {
   working: "settings.quitGuard.working",
@@ -69,6 +79,9 @@ interface SettingsGeneralTabProps {
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
   const appearance = useAppearanceChoice();
+  const [transparencyDraft, setTransparencyDraft] = createSignal<number>();
+  const clearTransparencyPreview = () => document.documentElement.style.removeProperty("--window-transparency-preview");
+  onCleanup(clearTransparencyPreview);
   const logoColor = useLogoColorChoice();
   const interfaceSize = useInterfaceSizeChoice();
   const layout = useLayout();
@@ -115,6 +128,63 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               label={i18n.t("settings.appearance.transparentWindow.title")}
               description={i18n.t("settings.appearance.transparentWindow.description")}
             />
+          </Show>
+          <Show when={appearance.windowMaterial() !== null}>
+            <Item data-settings-row="settings.appearance.windowMaterial.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.appearance.windowMaterial.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.appearance.windowMaterial.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Select<AppWindowMaterial>
+                  class="settings-modal-select"
+                  options={windowMaterialOptions}
+                  value={appearance.windowMaterial() ?? "solid"}
+                  onChange={(value) => {
+                    if (value) appearance.changeWindowMaterial(value);
+                  }}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>
+                      {i18n.t(WINDOW_MATERIAL_LABEL[selectProps.item.rawValue])}
+                    </SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={i18n.t("settings.appearance.windowMaterial.title")}>
+                    <SelectValue<AppWindowMaterial>>
+                      {(state) => i18n.t(WINDOW_MATERIAL_LABEL[state.selectedOption() ?? "solid"])}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+          </Show>
+          <Show when={appearance.windowMaterial() !== null || props.platform === "darwin"}>
+            <Item data-settings-row="settings.appearance.windowTransparency.title" class="settings-modal-row">
+              <ItemContent>
+                <SliderField
+                  label={i18n.t("settings.appearance.windowTransparency.title")}
+                  value={transparencyDraft() ?? appearance.windowTransparency()}
+                  minValue={0}
+                  maxValue={MAX_WINDOW_TRANSPARENCY}
+                  step={5}
+                  disabled={!appearance.transparentWindow()}
+                  formatValue={(value) => format.percent(value / 100)}
+                  onChange={(value) => {
+                    if (value === (transparencyDraft() ?? appearance.windowTransparency())) return;
+                    setTransparencyDraft(value);
+                    document.documentElement.style.setProperty("--window-transparency-preview", String(value / 100));
+                  }}
+                  onChangeEnd={(value) => {
+                    if (transparencyDraft() === undefined) return;
+                    if (value !== appearance.windowTransparency()) appearance.changeWindowTransparency(value);
+                    setTransparencyDraft(undefined);
+                    clearTransparencyPreview();
+                  }}
+                />
+              </ItemContent>
+            </Item>
           </Show>
           <Item data-settings-row="settings.language.title" class="settings-modal-row">
             <ItemContent>

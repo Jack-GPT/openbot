@@ -11,6 +11,9 @@ import {
   isSpeechVoice,
   isVoiceModelId,
   isXaiSpeechVoice,
+  KOKORO_SPEECH_MODEL,
+  MOSS_LIVE_VOICES,
+  type MossLiveVoice,
   modelLanguage,
   SPEECH_MODEL,
   SPEECH_MODEL_ID,
@@ -51,7 +54,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
-import type { SettingsVoiceStore } from "./settings-voice-store";
+import type { LiveVoiceProvider, SettingsVoiceStore } from "./settings-voice-store";
 import {
   type ModelChoice,
   type ModelDownload,
@@ -61,6 +64,15 @@ import {
   VoiceModelRow,
 } from "./VoiceModelRow";
 import { VoiceServerDialog } from "./VoiceServerDialog";
+
+const LIVE_VOICE_PROVIDERS: LiveVoiceProvider[] = ["codex", "moss"];
+const MOSS_VOICE_OPTIONS = ["default", ...MOSS_LIVE_VOICES] satisfies (MossLiveVoice | "default")[];
+type MossVoiceChoice = (typeof MOSS_VOICE_OPTIONS)[number];
+const MOSS_VOICE_NAMES = {
+  default: "settings.voice.live.moss.voice.default",
+  nuannuan: "settings.voice.live.moss.voice.nuannuan",
+  mumu: "settings.voice.live.moss.voice.mumu",
+} as const satisfies Record<MossVoiceChoice, AppTextKey>;
 
 const MODEL_DESCRIPTION = {
   "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
@@ -75,6 +87,7 @@ const MODEL_DESCRIPTION = {
 
 const SPEECH_MODEL_DESCRIPTION = {
   [SPEECH_MODEL_ID]: "settings.voice.speech.model.description",
+  [KOKORO_SPEECH_MODEL.id]: "settings.voice.speech.model.kokoro.description",
   "elevenlabs-flash-v2.5": "settings.voice.speech.model.flash.description",
   "elevenlabs-multilingual-v2": "settings.voice.speech.model.multilingual.description",
   "elevenlabs-v3": "settings.voice.speech.model.v3.description",
@@ -83,9 +96,10 @@ const SPEECH_MODEL_DESCRIPTION = {
   "xai-tts": "settings.voice.speech.model.xai.description",
 } as const satisfies Record<SpeechModelId, AppTextKey>;
 
-/** Supertonic first, then the cloud models by provider. */
+/** Local models first, then the cloud models by provider. */
 const SPEECH_CHOICES: readonly ModelChoice<SpeechModelId>[] = [
   { id: SPEECH_MODEL_ID, name: SPEECH_MODEL.name, place: "local" },
+  { id: KOKORO_SPEECH_MODEL.id, name: KOKORO_SPEECH_MODEL.name, place: "local" },
   ...CLOUD_SPEECH_MODELS.map((model) => ({ id: model.id, name: model.name, place: model.provider })),
 ];
 
@@ -325,6 +339,12 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   };
 
   const speechModel = () => speech().settings?.modelId;
+  const kokoro = () => speechModel() === KOKORO_SPEECH_MODEL.id;
+  const localSpeechModel = () => {
+    if (kokoro()) return KOKORO_SPEECH_MODEL;
+    if (speechModel() === SPEECH_MODEL_ID) return SPEECH_MODEL;
+    return null;
+  };
   const speechCloud = () => {
     const id = speechModel();
     return id ? cloudSpeechModel(id) : undefined;
@@ -338,8 +358,10 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   const speechReady = () => speechStatus()?.phase === "ready";
   const speechKeySaved = (provider: SpeechKeyProvider) =>
     provider === "elevenlabs" ? elevenLabsKeySaved() : speechStatus()?.phase === "ready";
-  const speechFile = (): ModelFile | null =>
-    speechModel() === SPEECH_MODEL_ID ? { bytes: SPEECH_MODEL.bytes, status: speechStatus() } : null;
+  const speechFile = (): ModelFile | null => {
+    const model = localSpeechModel();
+    return model ? { bytes: model.bytes, status: speechStatus() } : null;
+  };
   const speechDescription = (): AppTextKey => {
     const id = speechModel();
     return id ? SPEECH_MODEL_DESCRIPTION[id] : "settings.voice.speech.model.description";
@@ -374,10 +396,11 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
         : [];
     });
     const status = speech().status;
-    if (status?.modelId === SPEECH_MODEL_ID)
+    const model = localSpeechModel();
+    if (model && status?.modelId === model.id)
       local.push({
-        id: SPEECH_MODEL_ID,
-        name: SPEECH_MODEL.name,
+        id: model.id,
+        name: model.name,
         progress: status.progress ?? 0,
         ready: status.phase === "ready",
       });
@@ -388,16 +411,36 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
       (model): string => model.id,
     );
     const status = speech().status;
-    if (status?.modelId === SPEECH_MODEL_ID && status.phase === "downloading") ids.push(SPEECH_MODEL_ID);
+    if (localSpeechModel()?.id === status?.modelId && status?.phase === "downloading") ids.push(status.modelId);
     return ids;
   });
   const cancelDownload = (id: string) => {
-    if (id === SPEECH_MODEL_ID) props.store.cancelSpeech();
+    if (id === SPEECH_MODEL_ID || id === KOKORO_SPEECH_MODEL.id) props.store.cancelSpeech();
     else if (isVoiceModelId(id)) props.store.cancel(id);
   };
 
   const [editingServer, setEditingServer] = createSignal(false);
 
+  const [lastLiveProvider, setLastLiveProvider] = createSignal<LiveVoiceProvider>("codex");
+  const liveProvider = (): LiveVoiceProvider | null => {
+    const settings = speech().settings;
+    if (settings?.mossLive) return "moss";
+    return settings?.codexLive ? "codex" : null;
+  };
+  const selectLiveProvider = (provider: LiveVoiceProvider) => {
+    setLastLiveProvider(provider);
+    props.store.setLiveVoiceProvider(provider);
+  };
+  const toggleLiveVoice = (enabled: boolean) => {
+    if (enabled) selectLiveProvider(lastLiveProvider());
+    else {
+      const provider = liveProvider();
+      if (provider) setLastLiveProvider(provider);
+      props.store.setLiveVoiceProvider(null);
+    }
+  };
+  const liveProviderName = (provider: LiveVoiceProvider) =>
+    t(provider === "codex" ? "settings.voice.speech.codexLive.title" : "settings.voice.live.moss.title");
   const liveVoice = (): LiveVoiceChoice => speech().settings?.codexLiveVoice ?? "automatic";
   /** The voices' own names, which stay the same in each language. */
   const liveVoiceName = (voice: LiveVoiceChoice) =>
@@ -531,27 +574,29 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   </Show>
                   {speech().listening ? t("settings.voice.speech.voice.stop") : t("settings.voice.speech.voice.listen")}
                 </Button>
-                <Select<string>
-                  class="settings-modal-select"
-                  options={voiceOptions()}
-                  value={chosenVoice()}
-                  onChange={(next) => next && chooseVoice(next)}
-                  disabled={!speech().settings}
-                  placement="bottom-end"
-                  itemComponent={(selectProps) => (
-                    <SelectItem item={selectProps.item}>{anyVoiceName(selectProps.item.rawValue)}</SelectItem>
-                  )}
-                >
-                  <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
-                    <SelectValue<string>>
-                      {(state) => {
-                        const voice = state.selectedOption();
-                        return voice && anyVoiceName(voice);
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent mount={props.selectMount} />
-                </Select>
+                <Show when={!kokoro()}>
+                  <Select<string>
+                    class="settings-modal-select"
+                    options={voiceOptions()}
+                    value={chosenVoice()}
+                    onChange={(next) => next && chooseVoice(next)}
+                    disabled={!speech().settings}
+                    placement="bottom-end"
+                    itemComponent={(selectProps) => (
+                      <SelectItem item={selectProps.item}>{anyVoiceName(selectProps.item.rawValue)}</SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
+                      <SelectValue<string>>
+                        {(state) => {
+                          const voice = state.selectedOption();
+                          return voice && anyVoiceName(voice);
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent mount={props.selectMount} />
+                  </Select>
+                </Show>
               </ItemActions>
             </Item>
           </Show>
@@ -590,34 +635,95 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
 
       <SettingsSection title={t("settings.voice.live.section")}>
         <ItemGroup class="settings-modal-card">
-          <Show
-            when={props.codexLiveAccess !== "signIn"}
-            fallback={
-              <Item data-settings-row="settings.voice.speech.codexLive.title" class="settings-modal-row">
+          <SwitchField
+            data-settings-row="settings.voice.live.section"
+            checked={liveProvider() !== null}
+            disabled={!speech().settings}
+            onChange={toggleLiveVoice}
+            label={t("settings.voice.live.section")}
+          />
+          <Show when={liveProvider()}>
+            {(provider) => (
+              <Item class="settings-modal-row">
                 <ItemContent>
-                  <ItemTitle>{t("settings.voice.speech.codexLive.title")}</ItemTitle>
-                  <ItemDescription>{t("settings.voice.live.signIn")}</ItemDescription>
+                  <ItemTitle>{t("settings.voice.live.provider")}</ItemTitle>
+                  <ItemDescription>
+                    {t(
+                      provider() === "codex"
+                        ? "settings.voice.speech.codexLive.description"
+                        : "settings.voice.live.moss.description",
+                    )}
+                  </ItemDescription>
                 </ItemContent>
-                <Show when={props.onConnectCodex}>
-                  {(connect) => (
-                    <ItemActions>
-                      <Button variant="outline" size="sm" type="button" onClick={() => connect()()}>
-                        {t("settings.voice.server.connect")}
-                      </Button>
-                    </ItemActions>
-                  )}
-                </Show>
+                <ItemActions>
+                  <Select<LiveVoiceProvider>
+                    class="settings-modal-select"
+                    options={LIVE_VOICE_PROVIDERS}
+                    value={provider()}
+                    onChange={(next) => next && selectLiveProvider(next)}
+                    placement="bottom-end"
+                    itemComponent={(selectProps) => (
+                      <SelectItem item={selectProps.item}>{liveProviderName(selectProps.item.rawValue)}</SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" aria-label={t("settings.voice.live.provider")}>
+                      <SelectValue<LiveVoiceProvider>>{() => liveProviderName(provider())}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent mount={props.selectMount} />
+                  </Select>
+                </ItemActions>
               </Item>
-            }
-          >
-            <SwitchField
-              data-settings-row="settings.voice.speech.codexLive.title"
-              checked={speech().settings?.codexLive ?? false}
-              disabled={!speech().settings}
-              onChange={(checked) => props.store.setCodexLive(checked)}
-              label={t("settings.voice.speech.codexLive.title")}
-              description={t("settings.voice.speech.codexLive.description")}
+            )}
+          </Show>
+          <Show when={liveProvider() === "moss"}>
+            <VoiceKeyRow
+              provider="moss"
+              saved={props.store.state.mossKeySaved}
+              onSave={props.store.setMossKey}
+              onRemove={() => void props.store.setMossKey(null)}
             />
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
+              </ItemContent>
+              <ItemActions>
+                <Select<MossVoiceChoice>
+                  class="settings-modal-select"
+                  options={MOSS_VOICE_OPTIONS}
+                  value={speech().settings?.mossLiveVoice ?? "default"}
+                  onChange={(next) => next && props.store.setMossLiveVoice(next === "default" ? null : next)}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>{t(MOSS_VOICE_NAMES[selectProps.item.rawValue])}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
+                    <SelectValue<MossVoiceChoice>>
+                      {(state) => t(MOSS_VOICE_NAMES[state.selectedOption() ?? "default"])}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+          </Show>
+          <Show when={liveProvider() === "codex" && props.codexLiveAccess === "signIn"}>
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemDescription>{t("settings.voice.live.signIn")}</ItemDescription>
+              </ItemContent>
+              <Show when={props.onConnectCodex}>
+                {(connect) => (
+                  <ItemActions>
+                    <Button variant="outline" size="sm" type="button" onClick={() => connect()()}>
+                      {t("settings.voice.server.connect")}
+                    </Button>
+                  </ItemActions>
+                )}
+              </Show>
+            </Item>
+          </Show>
+          <Show when={liveProvider() === "codex" && props.codexLiveAccess !== "signIn"}>
             <Item class="settings-modal-row">
               <ItemContent>
                 <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
@@ -628,7 +734,6 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   options={["automatic", ...CODEX_LIVE_VOICES]}
                   value={liveVoice()}
                   onChange={(next) => next && props.store.setCodexLiveVoice(next === "automatic" ? null : next)}
-                  disabled={!speech().settings?.codexLive}
                   placement="bottom-end"
                   itemComponent={(selectProps) => (
                     <SelectItem item={selectProps.item}>{liveVoiceName(selectProps.item.rawValue)}</SelectItem>

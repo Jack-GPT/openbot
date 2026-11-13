@@ -17,6 +17,11 @@ export interface SpeechPort {
     | "keepRecording"
     | "getServer"
     | "onServerSettings"
+    | "startMoss"
+    | "stopMoss"
+    | "mossAudio"
+    | "mossControl"
+    | "onMossEvent"
   >;
   agent: Pick<OpenBotDesktopApi["agent"], "readConversationPage" | "discardDraftAttachment">;
 }

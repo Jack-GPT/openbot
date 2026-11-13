@@ -100,6 +100,8 @@ export interface AcpFlavor {
    * discovery then resumes one probe session for each process rather than opening another.
    */
   closeKeepsSession?: true;
+  /** Delete the model probe. This command is for versions without ACP session deletion. */
+  deleteProbeCommand?(sessionId: string): readonly string[] | undefined;
   /** How long a model discovery session stays open after discovery read it. Absent: it closes at once. */
   probeCloseDelayMs?: number;
   /**

@@ -12,6 +12,8 @@ const LEVEL_FLOOR_DB = -60;
 const LEVEL_RANGE_DB = 50;
 /** The data channel that the realtime model sends its events on, and takes commands from. */
 const EVENTS_CHANNEL = "oai-events";
+const ICE_GATHERING_TIMEOUT_MS = 4_000;
+const CONNECTION_TIMEOUT_MS = 15_000;
 
 export type CodexLivePort = Pick<OpenBotDesktopApi["voice"], "startLive" | "stopLive" | "onLiveEvent">;
 
@@ -45,6 +47,25 @@ function loudness(analyser: AnalyserNode, samples: Float32Array<ArrayBuffer>): n
   return Math.min(1, Math.max(0, (db - LEVEL_FLOOR_DB) / LEVEL_RANGE_DB));
 }
 
+/** Live voice sends one SDP offer. Include the candidates gathered before that request. */
+function waitForIceGathering(connection: RTCPeerConnection, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      connection.removeEventListener("icegatheringstatechange", check);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const check = () => {
+      if (connection.iceGatheringState === "complete" || signal.aborted) finish();
+    };
+    const timer = setTimeout(finish, ICE_GATHERING_TIMEOUT_MS);
+    connection.addEventListener("icegatheringstatechange", check);
+    signal.addEventListener("abort", finish, { once: true });
+    check();
+  });
+}
+
 /**
  * A voice conversation with a Codex agent through Codex live voice. The microphone and the reply go
  * over WebRTC between this window and OpenAI; the Codex App Server of the agent's server opens the
@@ -69,6 +90,8 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   const endedEarly = new Map<string, string | null>();
   let peer: RTCPeerConnection | undefined;
   let channel: RTCDataChannel | undefined;
+  let attempt: AbortController | undefined;
+  let connectionTimer: ReturnType<typeof setTimeout> | undefined;
   let microphone: MediaStream | undefined;
   let context: AudioContext | undefined;
   let microphoneMeter: AnalyserNode | undefined;
@@ -214,25 +237,55 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     try {
       context = new AudioContext();
       microphoneMeter = meter(microphone);
-      peer = new RTCPeerConnection();
-      for (const track of microphone.getAudioTracks()) peer.addTrack(track, microphone);
-      peer.addEventListener("track", (event) => {
-        const [stream] = event.streams;
-        if (!stream) return;
-        reply.srcObject = stream;
-        replyMeter = meter(stream);
-      });
-      channel = peer.createDataChannel(EVENTS_CHANNEL);
+      const connection = new RTCPeerConnection();
+      peer = connection;
+      const controller = new AbortController();
+      attempt = controller;
+      let listening = false;
+      const watchConnection = () => {
+        if (peer !== connection) return;
+        switch (connection.connectionState) {
+          case "connected":
+            clearTimeout(connectionTimer);
+            if (!listening) {
+              listening = true;
+              startMeter();
+              setStep("listening");
+            }
+            return;
+          case "failed":
+          case "closed":
+            failEnded(null);
+            return;
+        }
+      };
+      connection.addEventListener("connectionstatechange", watchConnection, { signal: controller.signal });
+      for (const track of microphone.getAudioTracks()) connection.addTrack(track, microphone);
+      connection.addEventListener(
+        "track",
+        (event) => {
+          const [stream] = event.streams;
+          if (!stream) return;
+          reply.srcObject = stream;
+          replyMeter = meter(stream);
+        },
+        { signal: controller.signal },
+      );
+      channel = connection.createDataChannel(EVENTS_CHANNEL);
       channel.addEventListener("message", (event) => onModelEvent(event.data));
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      if (!offer.sdp) throw new Error(currentText().t("conversation.voice.error"));
+      const offer = await connection.createOffer();
+      if (controller.signal.aborted) return;
+      await connection.setLocalDescription(offer);
+      await waitForIceGathering(connection, controller.signal);
+      if (controller.signal.aborted) return;
+      const sdp = connection.localDescription?.sdp;
+      if (!sdp) throw new Error(currentText().t("conversation.voice.error"));
       starting = true;
       endedEarly.clear();
-      const session = await port.startLive({ agentId: deps.agentId, sdp: offer.sdp }, deps.serverId).finally(() => {
+      const session = await port.startLive({ agentId: deps.agentId, sdp }, deps.serverId).finally(() => {
         starting = false;
       });
-      if (disposed) {
+      if (controller.signal.aborted) {
         void port.stopLive({ sessionId: session.sessionId }).catch(() => undefined);
         return;
       }
@@ -243,11 +296,13 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
       }
       endedEarly.clear();
       sessionId = session.sessionId;
-      await peer.setRemoteDescription({ type: "answer", sdp: session.sdp });
-      startMeter();
-      setStep("listening");
+      connectionTimer = setTimeout(() => {
+        if (peer === connection) fail(currentText().t("error.voice.live.timedOut"));
+      }, CONNECTION_TIMEOUT_MS);
+      await connection.setRemoteDescription({ type: "answer", sdp: session.sdp });
+      watchConnection();
     } catch (error) {
-      if (disposed) return;
+      if (disposed || failed) return;
       const { t, errorMessage } = currentText();
       fail(errorMessage(error, t("conversation.voice.error")));
     }
@@ -255,6 +310,10 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
 
   /** Ends the call and frees the microphone. The session in main ends with its own stop. */
   function release(): void {
+    attempt?.abort();
+    attempt = undefined;
+    clearTimeout(connectionTimer);
+    connectionTimer = undefined;
     if (meterTimer) clearInterval(meterTimer);
     meterTimer = undefined;
     if (sessionId) void port.stopLive({ sessionId }).catch(() => undefined);

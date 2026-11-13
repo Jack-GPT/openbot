@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "Events zijn niet beschikbaar op deze host.",
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
+  "error.backend.windowAppearanceInvalid": "Controleer de instellingen voor het uiterlijk van het venster.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
   "error.backend.webhookSenderSecretInvalid":
     "Plak het volledige ondertekeningsgeheim van de afzender. Het heeft 16 tot 1024 tekens en geen spaties.",

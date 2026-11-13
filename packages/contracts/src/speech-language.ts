@@ -420,12 +420,18 @@ function count(text: string, pattern: RegExp): number {
  * do not show a language.
  */
 export function speechLanguageOf(text: string, fallback: SpeechLanguage): SpeechLanguage | null {
+  const language = detectSpeechLanguage(text, fallback);
+  return language === "zh" ? null : language;
+}
+
+/** Detects Chinese for desktop speech engines that can use it. */
+export function detectSpeechLanguage(text: string, fallback: SpeechLanguage | "zh"): SpeechLanguage | "zh" | null {
   const letters = count(text, /\p{L}/gu);
   if (letters === 0) return fallback;
   const share = (pattern: RegExp) => count(text, pattern) / letters;
   if (share(/[぀-ヿ]/gu) > 0.05) return "ja";
   if (share(/[가-힯ᄀ-ᇿ㄰-㆏]/gu) > 0.2) return "ko";
-  if (share(/\p{Script=Han}/gu) > 0.2) return null;
+  if (share(/\p{Script=Han}/gu) > 0.2) return "zh";
   if (share(/\p{Script=Arabic}/gu) > 0.2) return "ar";
   if (share(/\p{Script=Greek}/gu) > 0.2) return "el";
   if (share(/\p{Script=Devanagari}/gu) > 0.2) return "hi";

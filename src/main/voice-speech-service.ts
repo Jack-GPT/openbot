@@ -1,8 +1,10 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   cloudSpeechModel,
+  KOKORO_SPEECH_MODEL,
+  type LocalSpeechModelId,
   SPEECH_MODEL_ID,
   SPEECH_VOICES,
   type SpeechAudio,
@@ -11,6 +13,7 @@ import {
   type SpeechSettings,
   VOICE_KEY_PROVIDER_NAMES,
 } from "@openbot/contracts/ipc";
+import { KOKORO_MODEL_DIRECTORY } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope, Semaphore } from "effect";
@@ -25,6 +28,7 @@ import {
   VoiceOperationError,
 } from "./voice-model-service";
 import type { VoiceSpeechFailure, VoiceSpeechHostProcess, VoiceSpeechResponse } from "./voice-speech-protocol";
+import { speakChineseOnWindows } from "./voice-windows-speech";
 
 const logger = createOpenBotLogger("voice-speech-service");
 
@@ -45,6 +49,7 @@ interface VoiceSpeechServiceOptions {
   /** The keys of the cloud models. The ElevenLabs key is the store of ElevenLabs dictation. */
   apiKeys: { elevenlabs: VoiceApiKeyStore; xai: VoiceApiKeyStore };
   fetch?: SpeechFetch;
+  modelFetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
 /** A failure the host reported. Only its category is known; the addon's own message stays there. */
@@ -66,7 +71,7 @@ interface PendingRequest {
 export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #addonPath: string;
-  readonly #model: VoiceModelService<typeof SPEECH_MODEL_ID>;
+  readonly #models: Record<LocalSpeechModelId, VoiceModelService<LocalSpeechModelId>>;
   readonly #preferences: SpeechPreferenceStore;
   readonly #spawnHost: () => VoiceSpeechHostProcess;
   readonly #apiKeys: VoiceSpeechServiceOptions["apiKeys"];
@@ -85,15 +90,29 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     this.#spawnHost = options.spawnHost;
     this.#apiKeys = options.apiKeys;
     this.#fetch = options.fetch ?? fetch;
-    this.#model = new VoiceModelService({
-      modelId: SPEECH_MODEL_ID,
-      directory: options.modelDirectory,
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-    });
-    // The status event is the status of the model in the settings.
-    this.#model.on("status", (status) => {
-      if (this.#preferences.get().modelId === SPEECH_MODEL_ID) this.emit("modelStatus", status);
-    });
+    const modelFetch = options.modelFetch ?? options.fetch;
+    const createModel = (modelId: LocalSpeechModelId, directory: string) =>
+      new VoiceModelService({
+        modelId,
+        directory,
+        ...(modelFetch === undefined ? {} : { fetch: modelFetch }),
+      });
+    this.#models = {
+      [SPEECH_MODEL_ID]: createModel(SPEECH_MODEL_ID, options.modelDirectory),
+      [KOKORO_SPEECH_MODEL.id]: createModel(
+        KOKORO_SPEECH_MODEL.id,
+        join(dirname(options.modelDirectory), KOKORO_MODEL_DIRECTORY),
+      ),
+    };
+    for (const model of Object.values(this.#models)) {
+      model.on("status", (status) => {
+        if (this.#preferences.get().modelId === status.modelId) this.emit("modelStatus", status);
+      });
+    }
+  }
+
+  #localModel(id = this.#preferences.get().modelId): VoiceModelService<LocalSpeechModelId> | undefined {
+    return id === SPEECH_MODEL_ID || id === KOKORO_SPEECH_MODEL.id ? this.#models[id] : undefined;
   }
 
   getSettings(): SpeechSettings {
@@ -107,8 +126,9 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     const before = this.#preferences.get().modelId;
     const saved = yield* this.#preferences.set(settings);
     if (saved.modelId !== before) {
-      // A Supertonic download that the user left stops. Its files stay until the user removes them.
-      if (before === SPEECH_MODEL_ID) yield* this.#model.cancel();
+      // Stop the old model's download. Keep its completed files.
+      const model = this.#localModel(before);
+      if (model) yield* model.cancel();
       yield* this.announceStatus();
     }
     return saved;
@@ -116,7 +136,8 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
 
   /** The status of the model in the settings. A cloud model is ready while its provider's key is saved. */
   readonly getModelStatus = Effect.fn("VoiceSpeech.getModelStatus")(function* (this: VoiceSpeechService) {
-    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.getStatus());
+    const model = this.#localModel();
+    return model ? (this.#runtimeMissing(model.modelId) ?? (yield* model.getStatus())) : this.#cloudStatus();
   }).bind(this);
 
   /** Sends the status of the model in the settings, after a key or the model changed. */
@@ -137,13 +158,15 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     return yield* this.announceStatus();
   }).bind(this);
 
-  /** Downloads Supertonic 3. A cloud model needs no download: its status is answered. */
+  /** Downloads the selected local model. A cloud model returns its status. */
   readonly downloadModel = Effect.fn("VoiceSpeech.downloadModel")(function* (this: VoiceSpeechService) {
-    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.prepare());
+    const model = this.#localModel();
+    return model ? (this.#runtimeMissing(model.modelId) ?? (yield* model.prepare())) : this.#cloudStatus();
   }).bind(this);
 
   readonly cancelModelDownload = Effect.fn("VoiceSpeech.cancelModelDownload")(function* (this: VoiceSpeechService) {
-    return this.#cloudStatus() ?? this.#runtimeMissing() ?? (yield* this.#model.cancel());
+    const model = this.#localModel();
+    return model ? (this.#runtimeMissing(model.modelId) ?? (yield* model.cancel())) : this.#cloudStatus();
   }).bind(this);
 
   /**
@@ -151,8 +174,10 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
    * finishes before the host ends. Replies are not read aloud until the model is downloaded again.
    */
   readonly removeModel = Effect.fn("VoiceSpeech.removeModel")(function* (this: VoiceSpeechService) {
-    const removed = yield* this.#requests.withPermit(this.#model.remove(Effect.suspend(() => this.#endHost())));
-    return this.#cloudStatus() ?? removed;
+    const model = this.#localModel();
+    return model
+      ? yield* this.#requests.withPermit(model.remove(Effect.suspend(() => this.#endHost())))
+      : this.#cloudStatus();
   }).bind(this);
 
   /** Reads one part of a reply with the model and voice in the settings. It does not download the model. */
@@ -186,16 +211,21 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         ),
       );
     }
-    const speakerId = SPEECH_VOICES.indexOf(settings.voice);
+    const model = this.#localModel(settings.modelId);
+    if (!model) return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.speech.failed")) });
+    const kokoro = model.modelId === KOKORO_SPEECH_MODEL.id;
+    if (!kokoro && input.language === "zh") return yield* this.#requests.withPermit(speakChineseOnWindows(input.text));
+    // The export starts with three English speakers, then zf_001 from the Chinese training set.
+    const speakerId = kokoro ? (input.language === "zh" ? 3 : 0) : SPEECH_VOICES.indexOf(settings.voice);
     const startedAt = Date.now();
     // The status is read with the permit: a removal that holds it can delete the model first.
     const speech = Effect.gen({ self: this }, function* () {
-      const status = yield* this.getModelStatus();
+      const status = this.#runtimeMissing(model.modelId) ?? (yield* model.getStatus());
       if (status.phase !== "ready")
         return yield* new VoiceOperationError({
           cause: new Error(status.message ?? sourceText("error.voice.speech.modelRequired")),
         });
-      return yield* this.#request(input, speakerId).pipe(
+      return yield* this.#request(model, input, speakerId).pipe(
         Effect.mapError((error) => {
           logger.error(
             `Speech of ${input.text.length} characters failed after ${Date.now() - startedAt}ms.`,
@@ -223,14 +253,15 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
    * until it is idle. A failure is only logged: the `speak` that follows reports it to the user.
    */
   readonly warm = Effect.fn("VoiceSpeech.warm")(function* (this: VoiceSpeechService) {
-    if (this.#preferences.get().modelId !== SPEECH_MODEL_ID) return;
+    const model = this.#localModel();
+    if (!model) return;
     const startedAt = Date.now();
     yield* this.#requests.withPermit(
       Effect.gen({ self: this }, function* () {
         // As in `speak`, a removal that holds the permit can delete the model first.
-        const status = yield* this.getModelStatus();
+        const status = this.#runtimeMissing(model.modelId) ?? (yield* model.getStatus());
         if (status.phase !== "ready") return;
-        yield* this.#request({ text: "", language: "en" }, 0, true).pipe(
+        yield* this.#request(model, { text: "", language: "en" }, 0, true).pipe(
           Effect.tap(() => Effect.sync(() => logger.info(`Speech model loaded in ${Date.now() - startedAt}ms.`))),
           Effect.catch((error) =>
             Effect.sync(() => logger.warn("Could not load the speech model in advance.", errorCategory(error.cause))),
@@ -242,15 +273,15 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
 
   readonly shutdown = Effect.fn("VoiceSpeech.shutdown")(function* (this: VoiceSpeechService) {
     this.#stopHost();
-    yield* this.#model.shutdown();
+    for (const model of Object.values(this.#models)) yield* model.shutdown();
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
 
   /** The status of a cloud model in the settings, or null while Supertonic is in the settings. */
-  #cloudStatus(): SpeechModelStatus | null {
+  #cloudStatus(): SpeechModelStatus {
     const { modelId } = this.#preferences.get();
     const cloud = cloudSpeechModel(modelId);
-    if (!cloud) return null;
+    if (!cloud) return { modelId, phase: "error", progress: null, message: sourceText("error.voice.speech.failed") };
     return this.#apiKeys[cloud.provider].get()
       ? { modelId, phase: "ready", progress: 100, message: null }
       : {
@@ -265,10 +296,10 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
   }
 
   /** Reports a build with no bundled sherpa-onnx runtime, as dictation does. */
-  #runtimeMissing(): SpeechModelStatus | null {
+  #runtimeMissing(modelId: LocalSpeechModelId): SpeechModelStatus | null {
     if (existsSync(this.#addonPath)) return null;
     const status: SpeechModelStatus = {
-      modelId: SPEECH_MODEL_ID,
+      modelId,
       phase: "error",
       progress: null,
       message: sourceText("error.voice.speech.runtimeUnavailable"),
@@ -278,7 +309,12 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
   }
 
   /** Sends one request to the host, starting it if needed, and keeps it loaded until it is idle. */
-  #request(input: SpeechInput, speakerId: number, loadOnly = false): Effect.Effect<SpeechAudio, VoiceOperationError> {
+  #request(
+    model: VoiceModelService<LocalSpeechModelId>,
+    input: SpeechInput,
+    speakerId: number,
+    loadOnly = false,
+  ): Effect.Effect<SpeechAudio, VoiceOperationError> {
     return Effect.callback<SpeechAudio, VoiceOperationError>((resume) => {
       this.#cancelIdleStop();
       const host = this.#ensureHost();
@@ -294,7 +330,8 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
       host.send({
         id,
         addonPath: this.#addonPath,
-        modelDirectory: this.#model.directory,
+        modelDirectory: model.directory,
+        ...(model.modelId === KOKORO_SPEECH_MODEL.id ? { kokoro: true as const } : {}),
         text: input.text,
         language: input.language,
         speakerId,

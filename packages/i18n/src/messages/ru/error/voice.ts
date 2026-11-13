@@ -36,4 +36,5 @@ export const messages = {
   "error.voice.live.refused":
     "Запуск живого голоса отклонён на стороне OpenAI. Повторите попытку позже или выключите живой голос в Настройках, чтобы говорить голосом.",
   "error.voice.live.off": "Живой голос Codex выключен. Включите его в Настройки → Голос.",
+  "error.voice.moss.failed": "Не удалось подключиться к MOSS Live. Проверьте ключ API и повторите попытку.",
 } as const satisfies PartialTranslation<typeof source>;

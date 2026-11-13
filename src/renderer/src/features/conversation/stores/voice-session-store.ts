@@ -1,10 +1,14 @@
 import { createEffect, createRoot, getOwner, runWithOwner, type Store } from "solid-js";
 import type { createCodexLiveConversation } from "./codex-live-conversation-store";
+import type { createMossLiveConversation } from "./moss-live-conversation-store";
 import type { SidePanelsState } from "./panels-store";
 import type { createVoiceConversation } from "./voice-conversation-store";
 
-export type VoiceConversationKind = "transcribed" | "codex-live";
-type VoiceConversation = ReturnType<typeof createCodexLiveConversation> | ReturnType<typeof createVoiceConversation>;
+export type VoiceConversationKind = "transcribed" | "codex-live" | "moss-live";
+type VoiceConversation =
+  | ReturnType<typeof createCodexLiveConversation>
+  | ReturnType<typeof createMossLiveConversation>
+  | ReturnType<typeof createVoiceConversation>;
 
 interface VoiceSession {
   readonly agentId: string;

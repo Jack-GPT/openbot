@@ -38,7 +38,7 @@
 :root[data-openbot-window-glass][data-openbot-color-scheme="light"][data-openbot-chat-background-light]
   .app-window
   :is(.conversation-panel:not(.window-page), .direct-conversation) {
-  --openbot-bg-canvas: color-mix(in srgb, var(--chat-background) 25%, transparent);
+  --openbot-bg-canvas: color-mix(in srgb, var(--chat-background) var(--window-glass-alpha-25), transparent);
 }
 
 /* In the window, the pane is transparent over the card that the agent list shares, and its header is

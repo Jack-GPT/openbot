@@ -13,15 +13,23 @@
 //      `bun run dev:stop` and `bun run dev:test-client` before the next run.
 //   6. Analytics: each window's OpenPanel requests are captured. The pane, turn and spoken reply
 //      events arrive with their metadata, and no request holds what the user said.
+//   7. Separate chat window: the window that starts the voice turn plays the reply.
 // Start the harness with the capture address, then run the script with `--allow-mutations`:
 //   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47322 bun run dev:test-client
 //   bun scripts/voice-pane-e2e.ts --allow-mutations
+// Use --playback-only to check the main and separate chat windows with Read replies aloud enabled.
+// Add --chinese to check Chinese input and replies with Kokoro.
 // Writes .openbot-build/voice-pane/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { OpenBotDesktopApi, StoredFileRow } from "@openbot/contracts/ipc";
+import {
+  KOKORO_SPEECH_MODEL,
+  type OpenBotDesktopApi,
+  type SpeechInput,
+  type StoredFileRow,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import type { Page } from "playwright-core";
@@ -33,6 +41,7 @@ declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
     voicePaneE2E?: { arm: (streams?: number) => void; calls: () => number; liveTracks: () => number };
+    voicePlaybackE2E?: { started: number; ended: number; playedSeconds: number };
   }
 }
 
@@ -40,12 +49,15 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/voice-pane");
 const AGENT = "Chief";
 const AGENT_ID = "chief";
 const QUESTION = "What is two plus two? Answer in five words or fewer.";
+const CHINESE_QUESTION = "请用一句完整的中文介绍大熊猫，至少十个汉字。";
 /** 120 s of Opus at 32 kbps is about 480 KB; a short question must stay far below this. */
 const MAXIMUM_RECORDING_BYTES = 600_000;
 const TURN_TIMEOUT_MS = 180_000;
 /** The app sends analytics here only when it starts with this capture address; no server listens on it. */
 const ANALYTICS_URL = "http://localhost:47322";
 const EVENT_TIMEOUT_MS = 15_000;
+const playbackOnly = process.argv.includes("--playback-only");
+const chinesePlayback = playbackOnly && process.argv.includes("--chinese");
 
 interface Check {
   name: string;
@@ -56,8 +68,8 @@ interface Check {
 const records = readDevInstanceRecords().filter((record) => resolve(record.projectRoot) === resolve(process.cwd()));
 const hostRecord = records.find((record) => record.service === "app");
 const clientRecord = records.find((record) => record.service === "test-client");
-assert.ok(hostRecord && clientRecord, "Start `bun run dev:test-client` for this worktree first.");
-for (const record of [hostRecord, clientRecord])
+assert.ok(hostRecord && (playbackOnly || clientRecord), "Start the development app for this worktree first.");
+for (const record of clientRecord && !playbackOnly ? [hostRecord, clientRecord] : [hostRecord])
   assertMutationAllowed({
     command: "voice-pane-e2e",
     allowMutations: process.argv.includes("--allow-mutations"),
@@ -72,10 +84,8 @@ const connect = (record: DevInstanceRecord) =>
     ownerPid: record.pid,
   });
 const hostSession = await connect(hostRecord);
-const clientSession = await connect(clientRecord);
 const host = hostSession.page;
-const client = clientSession.page;
-for (const page of [host, client]) page.setDefaultTimeout(30_000);
+host.setDefaultTimeout(30_000);
 
 mkdirSync(OUT, { recursive: true });
 const checks: Check[] = [];
@@ -88,7 +98,7 @@ const trackBody = z.object({
 });
 type EventProperties = z.infer<typeof trackBody>["payload"]["properties"];
 interface AnalyticsEvent {
-  window: "host" | "client";
+  window: "host" | "client" | "chat";
   name: string;
   properties: EventProperties;
 }
@@ -109,8 +119,11 @@ const check = (name: string, passed: boolean, detail: unknown = null) => {
 
 /** A fake microphone. `arm(n)` makes each of the next `n` streams say the question once; others are silent. */
 async function installMicrophone(page: Page): Promise<void> {
-  await page.evaluate(async (text) => {
-    const speech = await window.openbot.voice.speak({ text, language: "en" });
+  const input: SpeechInput = chinesePlayback
+    ? { text: CHINESE_QUESTION, language: "zh" }
+    : { text: QUESTION, language: "en" };
+  await page.evaluate(async ({ text, language }) => {
+    const speech = await window.openbot.voice.speak({ text, language });
     const context = new AudioContext();
     const samples = new Int16Array(speech.pcm.buffer, speech.pcm.byteOffset, speech.pcm.byteLength / 2);
     const buffer = context.createBuffer(1, samples.length, speech.sampleRate);
@@ -141,7 +154,7 @@ async function installMicrophone(page: Page): Promise<void> {
       liveTracks: () =>
         streams.flatMap((stream) => stream.getTracks()).filter((track) => track.readyState === "live").length,
     };
-  }, QUESTION);
+  }, input);
 }
 
 /** Answers the window's OpenPanel requests in the page and keeps each event. */
@@ -198,6 +211,96 @@ const isDuration = (value: unknown) => typeof value === "number" && value > 0;
 async function openAgent(page: Page): Promise<void> {
   await page.getByRole("button", { name: new RegExp(`^${AGENT},`) }).click();
   await page.getByRole("heading", { name: AGENT, level: 1 }).waitFor();
+}
+
+/** Records the playback of speech WAV files through the app's audio element. */
+async function watchPlayback(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const playback = { started: 0, ended: 0, playedSeconds: 0 };
+    window.voicePlaybackE2E = playback;
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (this instanceof HTMLAudioElement && this.src.startsWith("blob:")) {
+        this.addEventListener(
+          "playing",
+          () => {
+            playback.started += 1;
+          },
+          { once: true },
+        );
+        this.addEventListener(
+          "ended",
+          () => {
+            playback.ended += 1;
+            playback.playedSeconds += this.currentTime;
+          },
+          // Read the final position before the player clears the audio source.
+          { once: true, capture: true },
+        );
+      }
+      return play.call(this);
+    };
+  });
+}
+
+async function withChatWindow<T>(run: (chat: Page) => Promise<T>): Promise<T> {
+  const [chat] = await Promise.all([
+    host.context().waitForEvent("page"),
+    host.evaluate((agentId) => window.openbot.openChatWindow({ serverId: "local", agentId }), AGENT_ID),
+  ]);
+  try {
+    await chat.waitForURL((url) => url.searchParams.get("window") === "chat");
+    await chat.getByRole("heading", { name: AGENT, level: 1 }).waitFor();
+    return await run(chat);
+  } finally {
+    await chat.close();
+  }
+}
+
+async function verifyPlayback(page: Page, name: string): Promise<void> {
+  await watchPlayback(page);
+  await installMicrophone(page);
+  const before = chinesePlayback
+    ? await page.evaluate(async (agentId) => {
+        const p = await window.openbot.agent.readConversationPage(
+          { agentId, anchor: { type: "latest" }, limit: 1 },
+          "local",
+        );
+        return p.messages.at(-1)?.id ?? null;
+      }, AGENT_ID)
+    : null;
+  await openVoicePane(page);
+  try {
+    await page.waitForFunction(() => (window.voicePlaybackE2E?.playedSeconds ?? 0) > 0, undefined, {
+      timeout: TURN_TIMEOUT_MS,
+      polling: 100,
+    });
+    const playback = await page.evaluate(() => window.voicePlaybackE2E);
+    check(`${name}: Agent reply audio started and ended`, Boolean(playback?.started && playback.ended), playback);
+    if (chinesePlayback) {
+      const chinese = await page.evaluate(
+        async ({ agentId, before }) => {
+          const p = await window.openbot.agent.readConversationPage(
+            { agentId, anchor: { type: "latest" }, limit: 20 },
+            "local",
+          );
+          const messages = p.messages.slice(p.messages.findIndex((message) => message.id === before) + 1);
+          const hasChinese = (text: string) => /\p{Script=Han}/u.test(text);
+          return {
+            transcript: messages.some((message) => message.author === "user" && hasChinese(message.text)),
+            reply: messages.some(
+              (message) =>
+                message.author === "assistant" && message.itemType !== "commentary" && hasChinese(message.text),
+            ),
+          };
+        },
+        { agentId: AGENT_ID, before },
+      );
+      check(`${name}: Chinese transcript and reply`, chinese.transcript && chinese.reply, chinese);
+    }
+  } finally {
+    await closeVoicePane(page);
+  }
 }
 
 async function openVoicePane(page: Page, streams = 1): Promise<void> {
@@ -289,225 +392,308 @@ function draftEntries(record: DevInstanceRecord): string[] {
   }
 }
 
-let hostStopped = false;
-try {
-  await captureAnalytics(host, "host");
-  await captureAnalytics(client, "client");
-  await installMicrophone(host);
-  await installMicrophone(client);
-
-  // 1. Local.
-  await openAgent(host);
-  const recordingsBefore = new Set(
-    (await hostFiles()).filter((file) => file.mimeType.startsWith("audio/")).map((file) => file.id),
-  );
-  await openVoicePane(host);
-  const local = await speakOneTurn(host, "local");
-  report.local = local;
-  check("local: the reply is read aloud", local.spoke && local.error === null, local.phases);
-  check("local: the spoken message shows a player", local.hasPlayer, local.userMessage);
-  await closeVoicePane(host);
-  await checkEvent(
-    "analytics: the local pane start is sent",
-    "host",
-    "voice_conversation_action",
-    (event) => event.action === "start" && event.result === "succeeded" && event.server_kind === "local",
-  );
-  await checkEvent(
-    "analytics: the local turn is sent with its kept recording",
-    "host",
-    "voice_turn",
-    (event) =>
-      event.result === "succeeded" &&
-      event.server_kind === "local" &&
-      event.recording_kept === true &&
-      isDuration(event.audio_duration_seconds) &&
-      isDuration(event.duration_ms),
-  );
-  await checkEvent(
-    "analytics: the spoken reply is sent with its first audio time",
-    "host",
-    "speech_reply",
-    (event) =>
-      event.trigger === "voice_conversation" &&
-      event.result === "succeeded" &&
-      event.completed === true &&
-      isDuration(event.first_audio_ms) &&
-      isDuration(event.audio_duration_seconds),
-  );
-  await checkEvent(
-    "analytics: the local pane end is sent with its turn count",
-    "host",
-    "voice_conversation_action",
-    (event) => event.action === "end" && event.turn_count === 1 && isDuration(event.duration_ms),
-  );
-  const recording = (await hostFiles()).find(
-    (file) => file.mimeType.startsWith("audio/") && !recordingsBefore.has(file.id),
-  );
-  report.recording = recording ?? null;
-  check(
-    "local: the recording is WebM/Opus and small",
-    recording?.name === "voice.webm" && recording.mimeType === "audio/webm" && recording.size < MAXIMUM_RECORDING_BYTES,
-    recording && { name: recording.name, mimeType: recording.mimeType, size: recording.size },
-  );
-
-  // 2. Remote.
-  const remote = (await client.evaluate(() => window.openbot.servers.list())).find(
-    (server) => server.kind === "remote" && server.state === "online",
-  );
-  assert.ok(remote, "The test client has no online remote server.");
-  await client.evaluate((id) => window.openbot.servers.select(id), remote.id);
-  await openAgent(client);
-  const draftsBefore = draftEntries(clientRecord);
-  await openVoicePane(client);
-  const remoteTurn = await speakOneTurn(client, "remote");
-  report.remote = remoteTurn;
-  check("remote: the reply is read aloud", remoteTurn.spoke && remoteTurn.error === null, remoteTurn.phases);
-  check("remote: the message has text and no player", !remoteTurn.hasPlayer, remoteTurn.userMessage);
-  await checkEvent(
-    "analytics: the remote turn is sent with no kept recording",
-    "client",
-    "voice_turn",
-    (event) => event.result === "succeeded" && event.server_kind === "remote" && event.recording_kept === false,
-  );
-  const draftsAfter = draftEntries(clientRecord);
-  check(
-    "remote: no recording draft stays on the client",
-    draftsAfter.filter((entry) => !draftsBefore.includes(entry)).length === 0,
-    { draftsBefore, draftsAfter },
-  );
-
-  // 3. Storage: delete the local recording.
-  if (recording) {
-    // A Storage row has a message id only for a thread placement, so find the message by its recording.
-    const page = await host.evaluate(
-      (id) =>
-        window.openbot.agent.readConversationPage({ agentId: id, anchor: { type: "latest" }, limit: 20 }, "local"),
-      AGENT_ID,
+async function runPlaybackChecks(): Promise<void> {
+  const previous = await host.evaluate(async () => ({
+    speech: await window.openbot.voice.getSpeechSettings(),
+    dictation: await window.openbot.voice.getSettings(),
+    language: await window.openbot.getAppLanguagePreference(),
+  }));
+  try {
+    await host.evaluate(() => window.openbot.setAppLanguagePreference({ language: "en" }));
+    const ready = await host.evaluate(
+      async ({ chinese, modelId }) => {
+        const voice = window.openbot.voice;
+        const settings = await voice.setSpeechSettings({
+          ...(await voice.getSpeechSettings()),
+          readReplies: true,
+          codexLive: false,
+          ...(chinese ? { modelId } : {}),
+        });
+        const before = await voice.getSpeechModelStatus();
+        const status = before.phase === "ready" ? before : await voice.downloadSpeechModel();
+        const dictation = await voice.getSettings();
+        await voice.setSettings({
+          ...dictation,
+          modelId: "whisper-turbo",
+          ...(chinese ? { language: "zh" } : {}),
+        });
+        return { readReplies: settings.readReplies, phase: status.phase, message: status.message };
+      },
+      { chinese: chinesePlayback, modelId: KOKORO_SPEECH_MODEL.id },
     );
-    const message = page.messages.find((candidate) => candidate.voiceRecording?.id === recording.id);
-    check("storage: the recording belongs to the spoken message", message !== undefined, recording.id);
-    await host.evaluate((fileId) => window.openbot.storage.deleteFile({ fileId }, "local"), recording.id);
-    const listed = (await hostFiles()).some((file) => file.id === recording.id);
-    check("storage: the deleted recording is no longer listed", !listed);
-    const url = recording.previewUrl;
-    const status = url ? await host.evaluate(async (target) => (await fetch(target)).status, url) : null;
-    check("storage: the recording file is gone", status === 404, { status });
-    if (message) {
-      // The chat history keeps the message as it was sent; the bubble hides the player of a gone file.
-      await host.reload();
-      await openAgent(host);
-      const bubble = host.getByRole("article", { name: "Message from You" }).filter({ hasText: message.text }).last();
-      await bubble.waitFor();
-      await bubble.getByRole("button", { name: "Play voice message", exact: true }).waitFor({ state: "detached" });
-      await host.screenshot({ path: join(OUT, "storage-deleted.png") });
-      check("storage: the message keeps its text and has no player", true, message.text);
+    assert.ok(ready.readReplies, "Read replies aloud is off.");
+    assert.equal(ready.phase, "ready", ready.message ?? "The speech model is not ready.");
+    await openAgent(host);
+    await verifyPlayback(host, "main window");
+    const before = await host.evaluate(() => window.voicePlaybackE2E?.started);
+    await withChatWindow((chat) => verifyPlayback(chat, "separate chat window"));
+    const after = await host.evaluate(() => window.voicePlaybackE2E?.started);
+    check("main window: does not play the separate chat's reply", before === after, { before, after });
+  } catch (error) {
+    check("playback check completes", false, error instanceof Error ? error.message : String(error));
+  } finally {
+    writeFileSync(join(OUT, "playback-report.json"), `${JSON.stringify(checks, null, 2)}\n`);
+    try {
+      await host.evaluate(async ({ speech, dictation, language }) => {
+        await window.openbot.voice.setSpeechSettings(speech);
+        await window.openbot.voice.setSettings(dictation);
+        await window.openbot.setAppLanguagePreference(language);
+      }, previous);
+    } finally {
+      await hostSession.close();
     }
   }
+}
 
-  // 4. Interrupt. The first stream says the question; the second, opened while the agent thinks, says
-  // it again. A fast reply can start before it: the interrupt event shows that the voice stopped it. The storage case reloaded the host, which removed its microphone.
-  await installMicrophone(host);
-  await openVoicePane(host, 2);
-  const thinking = await waitForPhase(host, "Thinking");
-  const byVoice = await waitForPhase(host, "Listening");
-  const voiceCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
-  check(
-    "interrupt: speech while the agent thinks or speaks interrupts it, on the open microphone",
-    byVoice[0] === "Thinking" && byVoice.at(-1) === "Listening",
-    { thinking, byVoice },
-  );
-  // The next turn is short: the click must come while the agent thinks, before any event check waits.
-  const next = await waitForPhase(host, "Thinking");
-  // The microphone opens again after the send. The click waits for it, so the Stop button finds it open.
-  await host.waitForFunction(() => window.voicePaneE2E?.calls() === 3);
-  await host.getByRole("button", { name: "Interrupt", exact: true }).click();
-  const byButton = await waitForPhase(host, "Listening");
-  const buttonCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
-  check(
-    "interrupt: the Stop button interrupts the next turn, on the open microphone",
-    next.at(-1) === "Thinking" && byButton.at(-1) === "Listening" && !byButton.includes("Speaking"),
-    { next, byButton },
-  );
-  // The listening turn, the one open while the agent thought, and the one open while it thought again.
-  check("interrupt: no interrupt opens the microphone again", voiceCalls === 2 && buttonCalls === 3, {
-    voiceCalls,
-    buttonCalls,
-  });
-  await checkEvent(
-    "analytics: the interrupt by voice is sent",
-    "host",
-    "voice_conversation_action",
-    (event) => event.action === "interrupt" && event.trigger === "voice" && event.server_kind === "local",
-  );
-  await checkEvent(
-    "analytics: the interrupt by the Stop button is sent",
-    "host",
-    "voice_conversation_action",
-    (event) => event.action === "interrupt" && event.trigger === "button" && event.server_kind === "local",
-  );
-  await closeVoicePane(host);
+if (playbackOnly) {
+  await runPlaybackChecks();
+} else {
+  assert.ok(clientRecord);
+  await runVoicePaneChecks(clientRecord);
+}
 
-  // 5. Offline. The client's pane listens; the host stops serving. The dev client reaches the host
-  // through a local API port that a restarted host does not open again, so the client stays
-  // disconnected after this case, and the return to online is not checked here.
-  await client.getByText("Listening", { exact: true }).first().waitFor();
-  await host.evaluate(() => window.openbot.host.stop());
-  hostStopped = true;
-  const offlineText = "The server is not connected. The conversation continues when it connects again.";
-  await client.locator(".voice-panel-error", { hasText: offlineText }).waitFor({ timeout: 60_000 });
-  await client.screenshot({ path: join(OUT, "offline.png") });
-  const offline = {
-    ...(await paneState(client)),
-    ...(await client.evaluate(() => ({
-      liveTracks: window.voicePaneE2E?.liveTracks() ?? -1,
+async function runVoicePaneChecks(clientRecord: DevInstanceRecord): Promise<void> {
+  const clientSession = await connect(clientRecord);
+  const client = clientSession.page;
+  client.setDefaultTimeout(30_000);
+  let hostStopped = false;
+  try {
+    await captureAnalytics(host, "host");
+    await captureAnalytics(client, "client");
+    await installMicrophone(host);
+    await installMicrophone(client);
+
+    // 1. Local.
+    await openAgent(host);
+    const recordingsBefore = new Set(
+      (await hostFiles()).filter((file) => file.mimeType.startsWith("audio/")).map((file) => file.id),
+    );
+    await openVoicePane(host);
+    const local = await speakOneTurn(host, "local");
+    report.local = local;
+    check("local: the reply is read aloud", local.spoke && local.error === null, local.phases);
+    check("local: the spoken message shows a player", local.hasPlayer, local.userMessage);
+    await closeVoicePane(host);
+    await checkEvent(
+      "analytics: the local pane start is sent",
+      "host",
+      "voice_conversation_action",
+      (event) => event.action === "start" && event.result === "succeeded" && event.server_kind === "local",
+    );
+    await checkEvent(
+      "analytics: the local turn is sent with its kept recording",
+      "host",
+      "voice_turn",
+      (event) =>
+        event.result === "succeeded" &&
+        event.server_kind === "local" &&
+        event.recording_kept === true &&
+        isDuration(event.audio_duration_seconds) &&
+        isDuration(event.duration_ms),
+    );
+    await checkEvent(
+      "analytics: the spoken reply is sent with its first audio time",
+      "host",
+      "speech_reply",
+      (event) =>
+        event.trigger === "voice_conversation" &&
+        event.result === "succeeded" &&
+        event.completed === true &&
+        isDuration(event.first_audio_ms) &&
+        isDuration(event.audio_duration_seconds),
+    );
+    await checkEvent(
+      "analytics: the local pane end is sent with its turn count",
+      "host",
+      "voice_conversation_action",
+      (event) => event.action === "end" && event.turn_count === 1 && isDuration(event.duration_ms),
+    );
+    const recording = (await hostFiles()).find(
+      (file) => file.mimeType.startsWith("audio/") && !recordingsBefore.has(file.id),
+    );
+    report.recording = recording ?? null;
+    check(
+      "local: the recording is WebM/Opus and small",
+      recording?.name === "voice.webm" &&
+        recording.mimeType === "audio/webm" &&
+        recording.size < MAXIMUM_RECORDING_BYTES,
+      recording && { name: recording.name, mimeType: recording.mimeType, size: recording.size },
+    );
+
+    await withChatWindow(async (chat) => {
+      await captureAnalytics(chat, "chat");
+      await installMicrophone(chat);
+      await openVoicePane(chat);
+      const chatTurn = await speakOneTurn(chat, "chat-window");
+      check("chat window: the reply is read aloud", chatTurn.spoke && chatTurn.error === null, chatTurn.phases);
+      await checkEvent(
+        "chat window: playback completes in the window that sent the message",
+        "chat",
+        "speech_reply",
+        (event) => event.trigger === "voice_conversation" && event.result === "succeeded" && event.completed === true,
+      );
+    });
+
+    // 2. Remote.
+    const remote = (await client.evaluate(() => window.openbot.servers.list())).find(
+      (server) => server.kind === "remote" && server.state === "online",
+    );
+    assert.ok(remote, "The test client has no online remote server.");
+    await client.evaluate((id) => window.openbot.servers.select(id), remote.id);
+    await openAgent(client);
+    const draftsBefore = draftEntries(clientRecord);
+    await openVoicePane(client);
+    const remoteTurn = await speakOneTurn(client, "remote");
+    report.remote = remoteTurn;
+    check("remote: the reply is read aloud", remoteTurn.spoke && remoteTurn.error === null, remoteTurn.phases);
+    check("remote: the message has text and no player", !remoteTurn.hasPlayer, remoteTurn.userMessage);
+    await checkEvent(
+      "analytics: the remote turn is sent with no kept recording",
+      "client",
+      "voice_turn",
+      (event) => event.result === "succeeded" && event.server_kind === "remote" && event.recording_kept === false,
+    );
+    const draftsAfter = draftEntries(clientRecord);
+    check(
+      "remote: no recording draft stays on the client",
+      draftsAfter.filter((entry) => !draftsBefore.includes(entry)).length === 0,
+      { draftsBefore, draftsAfter },
+    );
+
+    // 3. Storage: delete the local recording.
+    if (recording) {
+      // A Storage row has a message id only for a thread placement, so find the message by its recording.
+      const page = await host.evaluate(
+        (id) =>
+          window.openbot.agent.readConversationPage({ agentId: id, anchor: { type: "latest" }, limit: 20 }, "local"),
+        AGENT_ID,
+      );
+      const message = page.messages.find((candidate) => candidate.voiceRecording?.id === recording.id);
+      check("storage: the recording belongs to the spoken message", message !== undefined, recording.id);
+      await host.evaluate((fileId) => window.openbot.storage.deleteFile({ fileId }, "local"), recording.id);
+      const listed = (await hostFiles()).some((file) => file.id === recording.id);
+      check("storage: the deleted recording is no longer listed", !listed);
+      const url = recording.previewUrl;
+      const status = url ? await host.evaluate(async (target) => (await fetch(target)).status, url) : null;
+      check("storage: the recording file is gone", status === 404, { status });
+      if (message) {
+        // The chat history keeps the message as it was sent; the bubble hides the player of a gone file.
+        await host.reload();
+        await openAgent(host);
+        const bubble = host.getByRole("article", { name: "Message from You" }).filter({ hasText: message.text }).last();
+        await bubble.waitFor();
+        await bubble.getByRole("button", { name: "Play voice message", exact: true }).waitFor({ state: "detached" });
+        await host.screenshot({ path: join(OUT, "storage-deleted.png") });
+        check("storage: the message keeps its text and has no player", true, message.text);
+      }
+    }
+
+    // 4. Interrupt. The first stream says the question; the second, opened while the agent thinks, says
+    // it again. A fast reply can start before it: the interrupt event shows that the voice stopped it. The storage case reloaded the host, which removed its microphone.
+    await installMicrophone(host);
+    await openVoicePane(host, 2);
+    const thinking = await waitForPhase(host, "Thinking");
+    const byVoice = await waitForPhase(host, "Listening");
+    const voiceCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
+    check(
+      "interrupt: speech while the agent thinks or speaks interrupts it, on the open microphone",
+      byVoice[0] === "Thinking" && byVoice.at(-1) === "Listening",
+      { thinking, byVoice },
+    );
+    // The next turn is short: the click must come while the agent thinks, before any event check waits.
+    const next = await waitForPhase(host, "Thinking");
+    // The microphone opens again after the send. The click waits for it, so the Stop button finds it open.
+    await host.waitForFunction(() => window.voicePaneE2E?.calls() === 3);
+    await host.getByRole("button", { name: "Interrupt", exact: true }).click();
+    const byButton = await waitForPhase(host, "Listening");
+    const buttonCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
+    check(
+      "interrupt: the Stop button interrupts the next turn, on the open microphone",
+      next.at(-1) === "Thinking" && byButton.at(-1) === "Listening" && !byButton.includes("Speaking"),
+      { next, byButton },
+    );
+    // The listening turn, the one open while the agent thought, and the one open while it thought again.
+    check("interrupt: no interrupt opens the microphone again", voiceCalls === 2 && buttonCalls === 3, {
+      voiceCalls,
+      buttonCalls,
+    });
+    await checkEvent(
+      "analytics: the interrupt by voice is sent",
+      "host",
+      "voice_conversation_action",
+      (event) => event.action === "interrupt" && event.trigger === "voice" && event.server_kind === "local",
+    );
+    await checkEvent(
+      "analytics: the interrupt by the Stop button is sent",
+      "host",
+      "voice_conversation_action",
+      (event) => event.action === "interrupt" && event.trigger === "button" && event.server_kind === "local",
+    );
+    await closeVoicePane(host);
+
+    // 5. Offline. The client's pane listens; the host stops serving. The dev client reaches the host
+    // through a local API port that a restarted host does not open again, so the client stays
+    // disconnected after this case, and the return to online is not checked here.
+    await client.getByText("Listening", { exact: true }).first().waitFor();
+    await host.evaluate(() => window.openbot.host.stop());
+    hostStopped = true;
+    const offlineText = "The server is not connected. The conversation continues when it connects again.";
+    await client.locator(".voice-panel-error", { hasText: offlineText }).waitFor({ timeout: 60_000 });
+    await client.screenshot({ path: join(OUT, "offline.png") });
+    const offline = {
+      ...(await paneState(client)),
+      ...(await client.evaluate(() => ({
+        liveTracks: window.voicePaneE2E?.liveTracks() ?? -1,
+        calls: window.voicePaneE2E?.calls() ?? -1,
+      }))),
+    };
+    check(
+      "offline: the pane says it is not connected and releases the microphone",
+      offline.phase === "Not connected" && offline.liveTracks === 0,
+      offline,
+    );
+    await host.evaluate(() => window.openbot.host.start());
+    hostStopped = false;
+    const later = await client.evaluate(() => ({
       calls: window.voicePaneE2E?.calls() ?? -1,
-    }))),
-  };
-  check(
-    "offline: the pane says it is not connected and releases the microphone",
-    offline.phase === "Not connected" && offline.liveTracks === 0,
-    offline,
-  );
-  await host.evaluate(() => window.openbot.host.start());
-  hostStopped = false;
-  const later = await client.evaluate(() => ({
-    calls: window.voicePaneE2E?.calls() ?? -1,
-    error: document.querySelector(".voice-panel-error")?.textContent?.trim() ?? null,
-  }));
-  check(
-    "offline: the pane does not open the microphone while the server is offline",
-    later.calls === offline.calls && later.error === offlineText,
-    later,
-  );
-  await closeVoicePane(client);
-  await checkEvent(
-    "analytics: the remote pane end is sent",
-    "client",
-    "voice_conversation_action",
-    (event) => event.action === "end" && event.server_kind === "remote",
-  );
-  const said = analyticsBodies.filter((body) => body.toLowerCase().includes("two plus two"));
-  check("analytics: no request holds what the user said", said.length === 0, said);
-  const versions = [
-    ...new Set(
-      events
-        .filter((event) => /^(?:voice_conversation_action|voice_turn|speech_reply)$/u.test(event.name))
-        .map((event) => event.properties.event_schema_version),
-    ),
-  ];
-  check(
-    `analytics: voice events use desktop schema ${ANALYTICS_GENERATIONS.desktop}`,
-    versions.length === 1 && versions[0] === ANALYTICS_GENERATIONS.desktop,
-    versions,
-  );
-} finally {
-  if (hostStopped) await host.evaluate(() => window.openbot.host.start()).catch(() => undefined);
-  writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
-  await hostSession.close();
-  await clientSession.close();
+      error: document.querySelector(".voice-panel-error")?.textContent?.trim() ?? null,
+    }));
+    check(
+      "offline: the pane does not open the microphone while the server is offline",
+      later.calls === offline.calls && later.error === offlineText,
+      later,
+    );
+    await closeVoicePane(client);
+    await checkEvent(
+      "analytics: the remote pane end is sent",
+      "client",
+      "voice_conversation_action",
+      (event) => event.action === "end" && event.server_kind === "remote",
+    );
+    const said = analyticsBodies.filter((body) => body.toLowerCase().includes("two plus two"));
+    check("analytics: no request holds what the user said", said.length === 0, said);
+    const versions = [
+      ...new Set(
+        events
+          .filter((event) => /^(?:voice_conversation_action|voice_turn|speech_reply)$/u.test(event.name))
+          .map((event) => event.properties.event_schema_version),
+      ),
+    ];
+    check(
+      `analytics: voice events use desktop schema ${ANALYTICS_GENERATIONS.desktop}`,
+      versions.length === 1 && versions[0] === ANALYTICS_GENERATIONS.desktop,
+      versions,
+    );
+  } finally {
+    if (hostStopped) await host.evaluate(() => window.openbot.host.start()).catch(() => undefined);
+    writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+    await hostSession.close();
+    await clientSession.close();
+  }
 }
 const failed = checks.filter((item) => !item.passed);
 for (const item of failed) logger.error(`Failed: ${item.name}.`, { detail: item.detail });
 assert.equal(failed.length, 0, `${failed.length} of ${checks.length} voice pane checks failed.`);
-logger.info(`Passed ${checks.length} voice pane checks. Wrote ${join(OUT, "report.json")}.`);
+logger.info(
+  `Passed ${checks.length} voice pane checks. Wrote ${join(OUT, playbackOnly ? "playback-report.json" : "report.json")}.`,
+);

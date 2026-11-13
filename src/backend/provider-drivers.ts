@@ -1018,6 +1018,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         flavor: OPENCODE_ACP_FLAVOR,
+        discoveryCwd: () => discoveryFolder("opencode"),
         argv: ["acp"],
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
@@ -1060,6 +1061,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         flavor: OPENCODE_ACP_FLAVOR,
+        discoveryCwd: () => discoveryFolder("opencode"),
         argv: ["acp"],
         profileGeneration: true,
         env: {},
@@ -1646,17 +1648,17 @@ export function savedCustomAgents(context: ProviderClientContext): readonly Cust
   return context.customAgents?.() ?? [];
 }
 
-let customAgentDiscoveryRoot: string | undefined;
+let discoveryRoot: string | undefined;
 
 /**
  * An empty folder for the session that lists an agent's models, apart from every workspace. The
  * root is new for each run and private (`mkdtemp`): a fixed path in a shared temp folder could be made
- * first by another user, with an agent config file in it that the agent would then load. Gemini uses
- * the folder `antigravity`, an id that no custom agent can have.
+ * first by another user, with an agent config file in it that the agent would then load. Built-in
+ * providers use their IDs. Custom agent IDs cannot match them.
  */
 function discoveryFolder(agentId: string): string {
-  customAgentDiscoveryRoot ??= mkdtempSync(join(tmpdir(), "openbot-custom-agents-"));
-  const folder = join(customAgentDiscoveryRoot, agentId);
+  discoveryRoot ??= mkdtempSync(join(tmpdir(), "openbot-discovery-"));
+  const folder = join(discoveryRoot, agentId);
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   return folder;
 }

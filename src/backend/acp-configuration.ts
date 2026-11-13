@@ -42,6 +42,11 @@ const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
  */
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
+/** Time left for probe deletion after the reasoning sweep and model restore. */
+const MODEL_PROBE_DELETE_RESERVE_MS = 1_000;
+/** Bounds cleanup even when it runs after the caller receives the catalog. */
+const MODEL_PROBE_DELETE_TIMEOUT_MS = 6_000;
+
 /**
  * What discovery keeps of the caller's timeout to return with. Every request it makes ends by its own
  * deadline, which is this much before the timeout: a catalog that was read in time is worth returning,
@@ -96,6 +101,13 @@ export interface AcpConfigurationOptions {
    * the process ends, so each discovery resumes the probe session of the process, not a new one.
    */
   keepProbeSession?: () => boolean;
+  deleteProbe?:
+    | ((
+        connection: ClientSideConnection,
+        sessionId: string,
+        cwd: string,
+      ) => Effect.Effect<void, ProviderClientOperationError>)
+    | undefined;
   /** `AcpFlavor.probeCloseDelayMs`. */
   probeCloseDelayMs?: number | undefined;
 }
@@ -120,26 +132,44 @@ export class AcpConfiguration {
   ): Effect.fn.Return<AcpModel[], ProviderClientOperationError> {
     const requestTimeoutMs = timeoutMs ?? this.options.requestTimeoutMs;
     const connection = yield* providerSync(() => this.options.connection());
+    const cwd = yield* providerSync(() => this.options.discoveryCwd?.() ?? process.cwd());
     // One deadline for the whole discovery, read before the session opens and held short of the
     // caller's own timeout: what the sweep may spend is what a slow `session/new` left of the time
     // the caller gave `model/list`. A sweep that timed the caller out would return no catalog at all.
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
+    const deleteProbe = this.options.deleteProbe;
     const sweep = Effect.acquireUseRelease(
-      this.#openProbe(connection),
-      (probe) => this.#modelReasoningEffortsEffect(connection, probe, modelsFromSessionSetup(probe), deadline),
+      this.#openProbe(connection, cwd),
       (probe) =>
-        this.options.keepProbeSession?.()
-          ? Effect.sync(() => {
-              this.#probe = { connection, sessionId: probe.sessionId };
-            })
-          : Effect.forkIn(
-              closeLater(
-                providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
-                this.options.probeCloseDelayMs,
-              ),
-              this.options.scope(),
-              { startImmediately: true },
-            ).pipe(Effect.asVoid),
+        this.#modelReasoningEffortsEffect(
+          connection,
+          probe,
+          modelsFromSessionSetup(probe),
+          deleteProbe ? deadline - MODEL_PROBE_DELETE_RESERVE_MS : deadline,
+        ),
+      ({ sessionId }) =>
+        Effect.gen({ self: this }, function* () {
+          if (this.options.keepProbeSession?.()) {
+            this.#probe = { connection, sessionId };
+            return;
+          }
+          const close = providerCall(() => connection.closeSession({ sessionId }));
+          const cleanup = deleteProbe
+            ? deleteProbe(connection, sessionId, cwd).pipe(
+                Effect.timeout(MODEL_PROBE_DELETE_TIMEOUT_MS),
+                Effect.catch(() =>
+                  Effect.sync(() =>
+                    logger.warn("OpenBot could not delete the model discovery session.", {
+                      provider: this.options.provider,
+                    }),
+                  ),
+                ),
+              )
+            : closeLater(close.pipe(Effect.ignore), this.options.probeCloseDelayMs);
+          const task = yield* Effect.forkIn(cleanup, this.options.scope(), { startImmediately: true });
+          // A slow deletion can finish in the client scope while the caller receives its models.
+          if (deleteProbe) yield* Fiber.join(task).pipe(Effect.timeoutOption(Math.max(0, deadline - Date.now())));
+        }),
     );
     const discovery = yield* Effect.forkIn(
       this.options.keepProbeSession?.() ? this.#probeLock.withPermit(sweep) : sweep,
@@ -171,8 +201,8 @@ export class AcpConfiguration {
   /** A new probe session, or the kept one resumed. A kept session that does not resume is replaced. */
   #openProbe(
     connection: ClientSideConnection,
+    cwd: string,
   ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
-    const cwd = this.options.discoveryCwd?.() ?? process.cwd();
     const opened = providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;

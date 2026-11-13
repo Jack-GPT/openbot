@@ -164,7 +164,7 @@ import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
-import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
+import { setInitialWindowGlass, setWindowAppearance, setWorkspaceWindowZoom } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
@@ -825,6 +825,7 @@ function registerIpcHandlers({
   instanceTransfer,
   voice,
   speech,
+  mossKey,
   voiceServer,
   dynamicIsland,
   agentDock,
@@ -919,6 +920,7 @@ function registerIpcHandlers({
     ...voiceIpcHandlers({
       voice,
       speech,
+      mossKey,
       server: voiceServer,
       service,
       remoteServers,
@@ -1809,9 +1811,9 @@ if (!hasSingleInstanceLock) {
         }
       });
       interfaceSize.subscribe((preference) => {
-        windows.getMainWindow()?.webContents.setZoomFactor(interfaceSize.zoomFactor);
-        for (const chatWindow of windows.getChatWindows())
-          chatWindow.webContents.setZoomFactor(interfaceSize.zoomFactor);
+        const mainWindow = windows.getMainWindow();
+        if (mainWindow) setWorkspaceWindowZoom(mainWindow, interfaceSize.zoomFactor);
+        for (const chatWindow of windows.getChatWindows()) setWorkspaceWindowZoom(chatWindow, interfaceSize.zoomFactor);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appInterfaceSizePreference, preference);
         }

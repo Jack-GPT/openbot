@@ -1,10 +1,5 @@
-import {
-  type AgentEvent,
-  type ConversationMessage,
-  latestTurnAnswer,
-  type SpeechLanguage,
-} from "@openbot/contracts/ipc";
-import { speechLanguageOf } from "@openbot/contracts/speech-language";
+import { type AgentEvent, type ConversationMessage, latestTurnAnswer, type SpeechInput } from "@openbot/contracts/ipc";
+import { detectSpeechLanguage } from "@openbot/contracts/speech-language";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
@@ -39,7 +34,7 @@ const ANSWER_LOOKUP_LIMIT = 50;
 interface DictatedMessage {
   dictatedAt: number;
   /** The language of the dictation, for a reply whose own words do not show one. */
-  language: SpeechLanguage;
+  language: SpeechInput["language"];
   /** The user turn that delivers the message, once it starts or the message steers a running one. */
   turnId: string | undefined;
   /** The send that carries the message started. */
@@ -105,7 +100,7 @@ function afterReadings(read: () => Promise<void>): Promise<void> {
 function readAfterReadings(
   markdown: string,
   source: SpeechSource,
-  fallback: SpeechLanguage,
+  fallback: SpeechInput["language"],
   trigger: SpeechTrigger,
 ): Promise<void> {
   const waiting = speechInput(markdown, fallback);
@@ -146,7 +141,7 @@ export function noteDictatedMessage(
   const key = agentKey(agent);
   dictated.set(key, {
     dictatedAt: Date.now(),
-    language: speechLanguageOf(transcript, "en") ?? "en",
+    language: detectSpeechLanguage(transcript, "en") ?? "en",
     turnId: undefined,
     sending: false,
     messageId: undefined,
@@ -440,15 +435,14 @@ function startRecording(messageId: string, url: string, from: number): void {
   });
 }
 
-function serverLanguage(fallback: SpeechLanguage): SpeechLanguage | null {
+function serverLanguage(fallback: SpeechInput["language"]): SpeechInput["language"] | null {
   return voiceServer()?.routes.speech ? fallback : null;
 }
 
 /** The text to read aloud and its language, or undefined when there is nothing to read. */
-function speechInput(markdown: string, fallback: SpeechLanguage): UpcomingReading | undefined {
+function speechInput(markdown: string, fallback: SpeechInput["language"]): UpcomingReading | undefined {
   const text = markdown ? speechTextFromMarkdown(markdown) : "";
-  // Supertonic reads only its own languages. The user's server takes any text, and ignores the language.
-  const language = text ? (speechLanguageOf(text, fallback) ?? serverLanguage(fallback)) : null;
+  const language = text ? (detectSpeechLanguage(text, fallback) ?? serverLanguage(fallback)) : null;
   return language ? { text, language } : undefined;
 }
 
@@ -459,7 +453,7 @@ function speechInput(markdown: string, fallback: SpeechLanguage): UpcomingReadin
 async function speak(
   markdown: string,
   source: SpeechSource,
-  fallback: SpeechLanguage,
+  fallback: SpeechInput["language"],
   trigger: SpeechTrigger,
   prepared?: UpcomingReading,
 ): Promise<void> {

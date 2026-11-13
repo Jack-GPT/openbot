@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "אירועים אינם זמינים במארח הזה.",
   "error.backend.databaseIntegrity": "מסד הנתונים של OpenBot נכשל בבדיקת השלמות.",
   "error.backend.webhookRouteLimit": "במארח אחד יכולות להיות לכל היותר {limit} שגרות webhook.",
+  "error.backend.windowAppearanceInvalid": "יש לבדוק את הגדרות המראה של החלון.",
   "error.backend.webhookSettingsInvalid": "יש לבדוק את הגדרות ה-webhook ולנסות שוב.",
   "error.backend.webhookSenderSecretInvalid":
     "יש להדביק את סוד החתימה המלא מהשולח. אורכו 16 עד 1024 תווים, ללא רווחים.",

@@ -579,6 +579,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  MossLiveControl,
+  MossLiveEvent,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -993,6 +995,13 @@ export const IPC_ENDPOINTS = {
     startLive: scopedRequest<VoiceLiveStart, VoiceLiveSession>()("voice:start-live"),
     /** Ends a live voice session. It does nothing when the session ended already. */
     stopLive: request<VoiceLiveStop, void>()("voice:stop-live"),
+    mossKeySaved: request<undefined, boolean>()("voice:moss-key-saved"),
+    setMossKey: request<{ key: string | null }, boolean>()("voice:set-moss-key"),
+    startMoss: request<undefined, void>()("voice:start-moss"),
+    stopMoss: request<undefined, void>()("voice:stop-moss"),
+    mossAudio: request<Uint8Array, void>()("voice:moss-audio"),
+    mossControl: request<MossLiveControl, void>()("voice:moss-control"),
+    mossEvent: event<MossLiveEvent>()("voice:moss-event"),
     liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
   },
   dynamicIsland: {

@@ -37,4 +37,5 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
+  "error.voice.moss.failed": "MOSS Live bağlanamadı. API anahtarını kontrol edip tekrar dene.",
 } as const satisfies PartialTranslation<typeof source>;

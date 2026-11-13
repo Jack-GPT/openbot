@@ -14,6 +14,8 @@
 // and refuses it for the others.
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
+
+import { Database } from "bun:sqlite";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -88,6 +90,7 @@ interface Report {
   passed: boolean;
   openCodeVersion?: string;
   models?: string[];
+  sessionsAfterDiscovery?: number;
   /** The efforts that OpenBot listed for each model. */
   efforts?: Record<string, string[]>;
   requests: Request[];
@@ -276,18 +279,35 @@ try {
   cliPath = cli.executable;
   await run(cli.executable, ["service", "set", "port", String(await freePort())], { env: process.env });
 
-  const client = requireProviderDriver("opencode").createClient(cli, 60_000, {
+  const driver = requireProviderDriver("opencode");
+  const context = {
     apiKey: () => null,
     customProviders: () => [endpoint],
     mcpServers: () => [],
     providerStateDirectory: join(root, "provider-state"),
-  });
+  };
+  const profile = driver.createProfileClient?.(cli, 60_000, context);
+  assert.ok(profile, "OpenCode must have a profile client.");
+  clients.push(profile);
+  profile.start();
+  await runCauseEffect(profile.request("initialize", {}, (value) => value));
+  await runCauseEffect(profile.stop());
+
+  const client = driver.createClient(cli, 60_000, context);
   clients.push(client);
   client.start();
 
   const listed = await runCauseEffect(client.request("model/list", {}, (value) => value));
   report.models = getArray(listed, "data").flatMap((model) => getString(model, "model") ?? []);
   assert.ok(report.models.includes(`${ENDPOINT}/${AGENT_MODEL}`), "OpenCode must list the agent's model.");
+  const { stdout: databasePath } = await run(cli.executable, ["debug", "paths", "db"], { env: process.env });
+  {
+    using database = new Database(databasePath.trim(), { readonly: true });
+    const sessions = database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM session_v2").get();
+    assert.ok(sessions, "Could not read the OpenCode session count.");
+    report.sessionsAfterDiscovery = sessions.count;
+  }
+  assert.equal(report.sessionsAfterDiscovery, 0, "OpenCode kept a session from model discovery.");
   report.efforts = Object.fromEntries(
     getArray(listed, "data").map((model) => [
       getString(model, "model") ?? "",

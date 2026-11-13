@@ -34,6 +34,7 @@ import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import type { RoutineResultsCalls } from "./routines-port";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
+import { createMossLiveConversation } from "./stores/moss-live-conversation-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
 
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
@@ -77,12 +78,13 @@ function VoiceConversationPane() {
       (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "live-voice-v1")) &&
       codexLiveAccess(props.agentStatus.providers) !== "signIn",
   );
-  const [kind, setKind] = createSignal<VoiceConversationKind | null>(running ?? (codex ? null : "transcribed"));
-  if (!running && codex)
+  const [kind, setKind] = createSignal<VoiceConversationKind | null>(running);
+  if (!running)
     void speechPort()
       .voice.getSpeechSettings()
       .then(
-        (settings) => setKind(settings.codexLive ? "codex-live" : "transcribed"),
+        (settings) =>
+          setKind(settings.mossLive ? "moss-live" : settings.codexLive && codex ? "codex-live" : "transcribed"),
         () => setKind("transcribed"),
       );
   return (
@@ -101,11 +103,12 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: Code
   const kind = untrack(() => paneProps.kind);
   const port = untrack(() => paneProps.port);
   // The conversation outlives this pane: another tab or chat keeps it, and closing the Voice tab ends it.
-  const conversation = controller.voiceSessions.open(agentId, kind, () =>
-    kind === "codex-live"
-      ? createCodexLiveConversation({ agentId, serverId, ...(port ? { port } : {}) })
-      : startVoiceConversation(agentId),
-  );
+  const conversation = controller.voiceSessions.open(agentId, kind, () => {
+    if (kind === "moss-live")
+      return createMossLiveConversation(speechPort().voice, conversationPort().agent, { agentId, serverId });
+    if (kind === "codex-live") return createCodexLiveConversation({ agentId, serverId, ...(port ? { port } : {}) });
+    return startVoiceConversation(agentId);
+  });
   // Codex live voice speaks at the speed of the realtime model, so it has no speed button.
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);

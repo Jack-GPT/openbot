@@ -4,6 +4,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.eventsUnavailable": "Events are not available on this host.",
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
+  "error.backend.windowAppearanceInvalid": "Check the window appearance settings.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
   "error.backend.webhookSenderSecretInvalid":
     "Paste the complete signing secret from the sender. It has 16 to 1024 characters and no spaces.",

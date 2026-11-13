@@ -3,9 +3,15 @@ import { EventEmitter } from "node:events";
 import { createReadStream, existsSync } from "node:fs";
 import { mkdir, open, rename, rm, stat } from "node:fs/promises";
 import { availableParallelism } from "node:os";
-import { join } from "node:path";
-import type { LocalSpeechModelId, LocalVoiceModelId, VoiceModelStatus } from "@openbot/contracts/ipc";
+import { dirname, join } from "node:path";
 import {
+  KOKORO_SPEECH_MODEL,
+  type LocalSpeechModelId,
+  type LocalVoiceModelId,
+  type VoiceModelStatus,
+} from "@openbot/contracts/ipc";
+import {
+  KOKORO_MODEL_FILES,
   PARAKEET_MODEL_FILES,
   PARAKEET_UNIFIED_MODEL_FILES,
   SUPERTONIC_MODEL_FILES,
@@ -189,6 +195,7 @@ const VOICE_MODEL_FILES: Record<DownloadedModelId, readonly VoiceModelFile[]> = 
   "whisper-turbo": WHISPER_TURBO_MODEL_FILES,
   "cohere-transcribe-03-2026": COHERE_TRANSCRIBE_MODEL_FILES,
   "supertonic-3": SUPERTONIC_MODEL_FILES,
+  [KOKORO_SPEECH_MODEL.id]: KOKORO_MODEL_FILES,
 };
 
 /** The status of one downloaded model. */
@@ -202,7 +209,7 @@ interface VoiceModelServiceOptions<Id extends DownloadedModelId> {
   modelId: Id;
   directory: string;
   files?: readonly VoiceModelFile[];
-  fetch?: ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined;
+  fetch?: ((input: string, init?: RequestInit) => Promise<Response>) | undefined;
 }
 
 /** What a verified file looked like, so a later check can skip the hash while nothing changed. */
@@ -216,7 +223,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
   readonly #directory: string;
   readonly #files: readonly VoiceModelFile[];
   readonly #totalBytes: number;
-  readonly #fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+  readonly #fetch: (input: string, init?: RequestInit) => Promise<Response>;
   /**
    * Files that passed the full SHA-256 check in this process. Transcription asks for the model about
    * once per second while the user speaks, and hashing 670 MB each time is not acceptable. A file
@@ -378,6 +385,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     let committed = false;
     return Effect.gen({ self: this }, function* () {
       yield* voiceIO(() => rm(partialPath, { force: true }));
+      yield* voiceIO(() => mkdir(dirname(path), { recursive: true, mode: 0o700 }));
       const response = yield* voiceIO(() => this.#fetch(file.url, { signal }));
       if (!response.ok || !response.body)
         return yield* new VoiceOperationError({ cause: new Error(`download-status-${response.status}`) });

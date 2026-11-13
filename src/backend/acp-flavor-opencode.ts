@@ -176,6 +176,8 @@ function openCodeFailureCause(error: unknown): CauseCode | null {
 }
 
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
+  deleteProbeCommand: (sessionId) =>
+    /^ses_[a-zA-Z0-9]+$/u.test(sessionId) ? ["session", "delete", sessionId] : undefined,
   // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
   // invalid params and the ID in data.sessionId. The same code with another message is a session of
   // another directory, which is not missing.

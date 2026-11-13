@@ -36,4 +36,5 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI가 라이브 음성 시작을 거부했습니다. 나중에 다시 시도하거나, 음성으로 대화하려면 설정에서 라이브 음성을 끄세요.",
   "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
+  "error.voice.moss.failed": "MOSS Live에 연결할 수 없습니다. API 키를 확인하고 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

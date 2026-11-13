@@ -14,6 +14,12 @@ export const messages = {
   "settings.appearance.transparentWindow.title": "Transparentes Fenster",
   "settings.appearance.transparentWindow.description":
     "Zeigt den unscharfen Schreibtisch hinter dem Fenster. Websites und Menüs nutzen dann das App-Design.",
+  "settings.appearance.windowMaterial.title": "Fenstermaterial",
+  "settings.appearance.windowMaterial.description": "Hintergrundeffekt für Arbeitsbereich und Chats anwenden.",
+  "settings.appearance.windowMaterial.solid": "Deckend",
+  "settings.appearance.windowMaterial.mica": "Mattglas (Mica)",
+  "settings.appearance.windowMaterial.acrylic": "Acryl",
+  "settings.appearance.windowTransparency.title": "Transparenz",
   "settings.interfaceSize.title": "Größe der Oberfläche",
   "settings.interfaceSize.description": "Die Größe von Text und Bedienelementen in OpenBot.",
   "settings.interfaceFont.title": "Schrift der Oberfläche",
@@ -682,6 +688,8 @@ export const messages = {
   "settings.voice.apiKey.removeFailed": "Der API-Schlüssel konnte nicht entfernt werden. Versuche es erneut.",
   "settings.voice.speech.section": "Gesprochene Antworten",
   "settings.voice.speech.model.description": "Liest Antworten auf diesem Computer vor, in 31 Sprachen.",
+  "settings.voice.speech.model.kokoro.description": "Liest chinesische und englische Texte auf diesem Gerät vor.",
+  "settings.voice.speech.model.kokoro.sample": "你好，今天过得怎么样？别着急，我们可以慢慢聊。",
   "settings.voice.speech.readReplies.title": "Antworten vorlesen",
   "settings.voice.speech.readReplies.description":
     "Wenn du eine Nachricht diktierst, wird die Antwort vorgelesen. Diktiere erneut, um sie zu stoppen.",
@@ -699,6 +707,13 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
   "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.live.provider": "Anbieter",
+  "settings.voice.live.moss.title": "MOSS Live",
+  "settings.voice.live.moss.description":
+    "Sendet während eines Sprachgesprächs Mikrofonton und Agentenantworten an MOSS.",
+  "settings.voice.live.moss.voice.default": "Standard",
+  "settings.voice.live.moss.voice.nuannuan": "Nuannuan",
+  "settings.voice.live.moss.voice.mumu": "Mumu",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":

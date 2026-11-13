@@ -1,16 +1,21 @@
+import { release } from "node:os";
 import {
   type AppAppearancePreference,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
   selectedThemePalette,
 } from "@openbot/contracts/app-appearance";
-import { type BrowserWindow, nativeTheme } from "electron";
+import { type BrowserWindow, type BrowserWindowConstructorOptions, nativeTheme } from "electron";
 
 /** The light canvas, `--openbot-bg-canvas` in `tokens-light.css`, so a light window opens without a dark frame. */
 const LIGHT_WINDOW_BACKGROUND = "#f5f5f6";
 
 /** The macOS material behind a transparent main window. The page paints its own tint over it. */
 const GLASS_VIBRANCY = "under-window";
+const WORKSPACE_HEADER_HEIGHT = 38;
+
+/** Electron supports system backdrops on Windows 11 22H2 and later. */
+export const supportsWindowMaterial = process.platform === "win32" && Number(release().split(".")[2]) >= 22621;
 
 let current: AppAppearancePreference = {
   appearance: DEFAULT_APP_APPEARANCE,
@@ -51,6 +56,29 @@ export function windowBackgroundColor(darkColor: string): string {
   return dark ? darkColor : LIGHT_WINDOW_BACKGROUND;
 }
 
+function windowControlColor() {
+  const appearance = selectedThemePalette(current)?.scheme ?? current.appearance;
+  const dark = appearance === "system" ? nativeTheme.shouldUseDarkColors : appearance === "dark";
+  return dark ? "#ffffff" : "#171717";
+}
+
+export function windowsTitleBarOptions(): BrowserWindowConstructorOptions {
+  return process.platform === "win32"
+    ? {
+        titleBarStyle: "hidden",
+        titleBarOverlay: { color: "#00000000", symbolColor: windowControlColor(), height: WORKSPACE_HEADER_HEIGHT },
+      }
+    : {};
+}
+
+/** Match the overlay height to the workspace toolbar when the interface size changes. */
+export function setWorkspaceWindowZoom(window: BrowserWindow, zoomFactor: number): void {
+  window.webContents.setZoomFactor(zoomFactor);
+  if (process.platform === "win32") {
+    window.setTitleBarOverlay({ height: Math.round(WORKSPACE_HEADER_HEIGHT * zoomFactor) });
+  }
+}
+
 /** Keeps an opaque window's background on the current appearance until the window closes. */
 export function followAppearance(window: BrowserWindow, darkColor: string): void {
   const update = () => {
@@ -71,30 +99,42 @@ export function setInitialWindowGlass(transparentWindow: boolean): void {
  * later the previous chat shows through and the window flickers. A window built with vibrancy and no
  * background color gets a clear background from Electron.
  */
-export function glassWindowOptions(
-  darkColor: string,
-): { vibrancy: typeof GLASS_VIBRANCY } | { backgroundColor: string } {
-  return current.transparentWindow
+export function glassWindowOptions(darkColor: string): BrowserWindowConstructorOptions {
+  const material = current.windowMaterial;
+  if (supportsWindowMaterial && material && material !== "solid") {
+    return { backgroundMaterial: material, backgroundColor: "#00000000" };
+  }
+  return process.platform === "darwin" && current.transparentWindow
     ? { vibrancy: GLASS_VIBRANCY }
     : { backgroundColor: windowBackgroundColor(darkColor) };
 }
 
 /**
- * Keeps the main window opaque or transparent, as the preference says, until the window closes. A
- * transparent window shows the macOS blur; the page then paints a translucent tint over it. The
- * blur keeps Electron's default `visualEffectState`, `followWindow`, so an inactive window stops the
- * live blur. Main applies the saved preference before the window shows.
+ * Keeps the workspace window and its native controls on the current appearance.
  */
 export function followWindowGlass(window: BrowserWindow, darkColor: string): void {
   // The window is built with `glassWindowOptions`, so it has the blur when the preference is on. A
   // window built opaque takes the blur here when the preference turns on later.
   let glass = current.transparentWindow;
+  let material = current.windowMaterial;
+  let controlColor = windowControlColor();
   const update = () => {
     if (window.isDestroyed()) return;
-    if (current.transparentWindow !== glass) {
-      glass = current.transparentWindow;
-      window.setVibrancy(glass ? GLASS_VIBRANCY : null);
+    if (process.platform === "win32") {
+      if (supportsWindowMaterial && current.windowMaterial !== material) {
+        material = current.windowMaterial;
+        window.setBackgroundMaterial(material === "mica" || material === "acrylic" ? material : "none");
+      }
+      const nextControlColor = windowControlColor();
+      if (nextControlColor !== controlColor) {
+        controlColor = nextControlColor;
+        window.setTitleBarOverlay({ symbolColor: controlColor });
+      }
     }
+    if (process.platform === "darwin" && current.transparentWindow !== glass) {
+      window.setVibrancy(current.transparentWindow ? GLASS_VIBRANCY : null);
+    }
+    glass = current.transparentWindow;
     window.setBackgroundColor(glass ? "#00000000" : windowBackgroundColor(darkColor));
   };
   update();

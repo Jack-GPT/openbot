@@ -2,6 +2,7 @@ import {
   DEFAULT_SPEECH_SETTINGS,
   isCodexLiveVoice,
   isElevenLabsSpeechVoice,
+  isMossLiveVoice,
   isSpeechModelId,
   isSpeechSpeed,
   isSpeechVoice,
@@ -49,7 +50,9 @@ export class SpeechPreferenceStore {
                   : DEFAULT_SPEECH_SETTINGS.elevenLabsVoice,
                 xaiVoice: isXaiSpeechVoice(parsed.xaiVoice) ? parsed.xaiVoice : DEFAULT_SPEECH_SETTINGS.xaiVoice,
                 speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
-                codexLive: parsed.codexLive === true,
+                codexLive: parsed.codexLive === true && parsed.mossLive !== true,
+                ...(parsed.mossLive === true ? { mossLive: true } : {}),
+                ...(isMossLiveVoice(parsed.mossLiveVoice) ? { mossLiveVoice: parsed.mossLiveVoice } : {}),
                 codexLiveVoice: isCodexLiveVoice(parsed.codexLiveVoice) ? parsed.codexLiveVoice : null,
               }
             : null,
@@ -74,7 +77,9 @@ export class SpeechPreferenceStore {
       elevenLabsVoice: input.elevenLabsVoice,
       xaiVoice: input.xaiVoice,
       speed: input.speed,
-      codexLive: input.codexLive,
+      codexLive: input.codexLive && input.mossLive !== true,
+      ...(input.mossLive === true ? { mossLive: true } : {}),
+      ...(input.mossLiveVoice != null ? { mossLiveVoice: input.mossLiveVoice } : {}),
       codexLiveVoice: input.codexLiveVoice,
     };
     yield* this.#writes.withPermit(

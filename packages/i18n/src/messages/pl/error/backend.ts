@@ -5,6 +5,7 @@ export const messages = {
   "error.backend.eventsUnavailable": "Zdarzenia nie są dostępne na tym hoście.",
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
+  "error.backend.windowAppearanceInvalid": "Sprawdź ustawienia wyglądu okna.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
   "error.backend.webhookSenderSecretInvalid":
     "Wklej pełny sekret podpisu od nadawcy. Ma od 16 do 1024 znaków i nie zawiera spacji.",

@@ -6,12 +6,14 @@ export interface VoiceSpeechRequest {
   id: number;
   /** Absolute path of `sherpa-onnx.node`. */
   addonPath: string;
-  /** The directory with the files of Supertonic 3. */
+  /** Kokoro uses a different model layout. Omitted for Supertonic. */
+  kokoro?: true;
+  /** The directory with the model files. */
   modelDirectory: string;
   text: string;
   /** A Supertonic 3 language code. */
   language: string;
-  /** The voice style: 0-4 are F1-F5, 5-9 are M1-M5. */
+  /** The model's speaker index. */
   speakerId: number;
   /** Only load the model, and answer with no audio. */
   loadOnly: boolean;

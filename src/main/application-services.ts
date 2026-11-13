@@ -123,6 +123,7 @@ import {
   Menu,
   Notification,
   nativeImage,
+  net,
   powerMonitor,
   screen,
   shell,
@@ -439,6 +440,7 @@ import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
+import { supportsWindowMaterial } from "./window-appearance";
 
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
@@ -768,6 +770,7 @@ export interface ApplicationServices {
   instanceTransfer: InstanceTransferService;
   voice: VoiceTranscriptionService;
   speech: VoiceSpeechService;
+  mossKey: VoiceApiKeyStore;
   voiceServer: VoiceServerService;
   dynamicIsland: DynamicIslandWindowController;
   agentDock: AgentDockWindowController;
@@ -1486,6 +1489,7 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE),
     paletteDirectory: join(app.getPath("userData"), THEME_PALETTE_DIRECTORY),
     supportsTransparentWindow: process.platform === "darwin",
+    supportsWindowMaterial,
   });
   // Before the renderer loads, so its first navigation applies the saved size.
   const interfaceSize = new InterfaceSizeService({
@@ -3944,6 +3948,11 @@ export async function createApplicationServices({
     cipher: secretCipher,
   });
   await runCauseEffect(xaiSpeechKeys.load());
+  const mossKey = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "moss-api-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(mossKey.load());
   const speech = new VoiceSpeechService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     modelDirectory: app.isPackaged
@@ -3951,6 +3960,8 @@ export async function createApplicationServices({
       : resolve(".openbot-build/voice", SUPERTONIC_MODEL_DIRECTORY),
     preferences: speechPreferences,
     spawnHost: spawnVoiceSpeechHost,
+    // Model downloads follow the system proxy. Cloud speech requests use their existing transport.
+    modelFetch: (input, init) => net.fetch(input, init),
     apiKeys: { elevenlabs: voiceApiKeys, xai: xaiSpeechKeys },
   });
   teardown.push(TEARDOWN_ORDER.speech, "speech", () => Effect.runPromise(speech.shutdown()));
@@ -4361,6 +4372,7 @@ export async function createApplicationServices({
     instanceTransfer,
     voice,
     speech,
+    mossKey,
     voiceServer,
     dynamicIsland,
     agentDock,

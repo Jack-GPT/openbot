@@ -2,6 +2,7 @@ import {
   isCodexLiveVoice,
   isDictationKeyProvider,
   isElevenLabsSpeechVoice,
+  isMossLiveVoice,
   isSpeechKeyProvider,
   isSpeechLanguage,
   isSpeechModelId,
@@ -11,6 +12,7 @@ import {
   isVoiceModelId,
   isVoiceServerRoutes,
   isXaiSpeechVoice,
+  type MossLiveControl,
   SPEECH_LIMITS,
   type SpeechApiKeyInput,
   type SpeechInput,
@@ -144,6 +146,8 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     !isXaiSpeechVoice(input.xaiVoice) ||
     !isSpeechSpeed(input.speed) ||
     typeof input.codexLive !== "boolean" ||
+    (input.mossLive !== undefined && typeof input.mossLive !== "boolean") ||
+    (input.mossLiveVoice != null && !isMossLiveVoice(input.mossLiveVoice)) ||
     !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice))
   ) {
     throw new Error("Speech settings need a known model, voice and speed.");
@@ -155,9 +159,45 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     elevenLabsVoice: input.elevenLabsVoice,
     xaiVoice: input.xaiVoice,
     speed: input.speed,
-    codexLive: input.codexLive,
+    codexLive: input.codexLive && input.mossLive !== true,
+    ...(input.mossLive === true ? { mossLive: true } : {}),
+    ...(input.mossLiveVoice != null ? { mossLiveVoice: input.mossLiveVoice } : {}),
     codexLiveVoice: input.codexLiveVoice,
   };
+}
+
+export function parseMossKey(input: unknown): { key: string | null } {
+  if (!isObject(input)) throw new Error("A key is required.");
+  return { key: parseApiKey(input.key) };
+}
+
+export function parseMossAudio(input: unknown): Uint8Array {
+  if (!(input instanceof Uint8Array) || input.byteLength === 0 || input.byteLength > 16_384 || input.byteLength % 2)
+    throw new Error("Invalid MOSS audio.");
+  return input;
+}
+
+export function parseMossControl(input: unknown): MossLiveControl {
+  const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 256;
+  if (isObject(input)) {
+    if (input.action === "mic" && typeof input.enabled === "boolean") return { action: "mic", enabled: input.enabled };
+    if (input.action === "answer" && id(input.callId) && typeof input.text === "string" && input.text.length <= 16_000)
+      return { action: "answer", callId: input.callId, text: input.text };
+    if (id(input.runId) && id(input.turnId)) {
+      const { runId, turnId } = input;
+      if (input.action === "completed") return { action: "completed", runId, turnId };
+      if (input.action === "played" && id(input.chunkId))
+        return { action: "played", runId, turnId, chunkId: input.chunkId };
+      if (
+        input.action === "stopped" &&
+        typeof input.playedMs === "number" &&
+        input.playedMs >= 0 &&
+        input.playedMs <= 60_000
+      )
+        return { action: "stopped", runId, turnId, playedMs: input.playedMs };
+    }
+  }
+  throw new Error("Invalid MOSS control.");
 }
 
 /** A Codex live voice start: the agent and the renderer's WebRTC offer. */
@@ -175,7 +215,12 @@ export function parseVoiceLiveStop(input: unknown): VoiceLiveStop {
 }
 
 export function parseSpeechInput(input: unknown): SpeechInput {
-  if (!isObject(input) || typeof input.text !== "string" || !input.text.trim() || !isSpeechLanguage(input.language))
+  if (
+    !isObject(input) ||
+    typeof input.text !== "string" ||
+    !input.text.trim() ||
+    (input.language !== "zh" && !isSpeechLanguage(input.language))
+  )
     throw new Error("Speech needs text and a known language.");
   if (input.text.length > SPEECH_LIMITS.maximumTextLength) throw new Error("The speech text is too long.");
   return { text: input.text, language: input.language };

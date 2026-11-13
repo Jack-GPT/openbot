@@ -1,4 +1,4 @@
-import type { SpeechAudio, SpeechLanguage } from "@openbot/contracts/ipc";
+import type { SpeechAudio, SpeechInput } from "@openbot/contracts/ipc";
 import { createStore } from "solid-js";
 import { speechPort } from "./speech-port";
 import { speechParts } from "./speech-text";
@@ -92,7 +92,7 @@ interface Reading {
 /** A text that is read aloud after the reading of now. */
 export interface UpcomingReading {
   text: string;
-  language: SpeechLanguage;
+  language: SpeechInput["language"];
   /** The synthesis of its first part, once it started. */
   first?: Promise<SpeechAudio>;
 }
@@ -319,7 +319,7 @@ export interface ReadAloudResult {
  */
 export async function readAloud(
   text: string,
-  language: SpeechLanguage,
+  language: SpeechInput["language"],
   source: SpeechSource | null = null,
   prepared?: UpcomingReading,
 ): Promise<ReadAloudResult> {

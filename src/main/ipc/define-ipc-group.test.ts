@@ -14,6 +14,9 @@ import { describe, expect, it, vi } from "vitest";
 import { agentRequest } from "./agent-inputs";
 import { eventPayloadHandler, handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
 import {
+  parseMossAudio,
+  parseMossControl,
+  parseMossKey,
   parseSpeechApiKey,
   parseSpeechInput,
   parseSpeechSettings,
@@ -104,6 +107,12 @@ function registerVoice(
     setServer: payloadHandler(parseVoiceServerSave, () => null),
     startLive: payloadHandler(agentRequest(parseVoiceLiveStart), () => ({ sessionId: "live-1", sdp: "answer" })),
     stopLive: payloadHandler(parseVoiceLiveStop, () => undefined),
+    mossKeySaved: handler(() => false),
+    setMossKey: payloadHandler(parseMossKey, () => false),
+    startMoss: handler(() => undefined),
+    stopMoss: handler(() => undefined),
+    mossAudio: payloadHandler(parseMossAudio, () => undefined),
+    mossControl: payloadHandler(parseMossControl, () => undefined),
   });
 }
 

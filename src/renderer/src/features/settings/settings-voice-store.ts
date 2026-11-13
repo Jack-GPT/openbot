@@ -4,6 +4,8 @@ import {
   ELEVENLABS_VOICE_MODEL_ID,
   type ElevenLabsSpeechVoice,
   isSpeechLanguage,
+  KOKORO_SPEECH_MODEL,
+  type MossLiveVoice,
   SPEECH_MODEL_ID,
   type SpeechKeyProvider,
   type SpeechModelId,
@@ -27,6 +29,8 @@ import { readAloud, stopSpeech } from "../speech/speech-playback";
 import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/speech-speed";
 import { voicePort } from "./voice-port";
 
+export type LiveVoiceProvider = "codex" | "moss";
+
 interface SettingsVoiceState {
   /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
@@ -38,6 +42,7 @@ interface SettingsVoiceState {
   speech: { status: SpeechModelStatus | null; settings: SpeechSettings | null; listening: boolean };
   /** The user's own voice server, or null when none is set up or before main answers. */
   server: VoiceServerSettings | null;
+  mossKeySaved: boolean;
 }
 
 const EMPTY_STATUSES: SettingsVoiceState["statuses"] = {
@@ -73,6 +78,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
     settings: null,
     speech: { status: null, settings: null, listening: false },
     server: null,
+    mossKeySaved: false,
   });
   const setServer = (server: VoiceServerSettings | null) =>
     setState((draft) => {
@@ -105,14 +111,16 @@ export function createSettingsVoiceStore(active: () => boolean) {
       voice.getSpeechModelStatus(),
       voice.getSpeechSettings(),
       voice.getServer(),
+      voice.mossKeySaved(),
     ])
-      .then(([statuses, settings, speechStatus, speechSettings, server]) => {
+      .then(([statuses, settings, speechStatus, speechSettings, server, mossKeySaved]) => {
         for (const status of statuses) setStatus(status);
         setState((draft) => {
           draft.settings = settings;
           draft.speech.status = speechStatus;
           draft.speech.settings = speechSettings;
           draft.server = server;
+          draft.mossKeySaved = mossKeySaved;
         });
       })
       .catch((error: unknown) => fail(error, "settings.voice.loadFailed"));
@@ -263,9 +271,21 @@ export function createSettingsVoiceStore(active: () => boolean) {
       void saveServer({ address: server.address, apiKey: null, routes: { ...server.routes, dictation: false } });
   }
 
-  /** Voice conversations with Codex agents use Codex live voice. Nothing is downloaded for it. */
-  function setCodexLive(codexLive: boolean): void {
-    void saveSpeech({ codexLive });
+  function setLiveVoiceProvider(provider: LiveVoiceProvider | null): void {
+    void saveSpeech({ codexLive: provider === "codex", mossLive: provider === "moss" });
+  }
+
+  async function setMossKey(key: string | null): Promise<boolean> {
+    try {
+      const saved = await voicePort().voice.setMossKey({ key });
+      setState((draft) => {
+        draft.mossKeySaved = saved;
+      });
+      return true;
+    } catch (error) {
+      fail(error, key === null ? "settings.voice.apiKey.removeFailed" : "settings.voice.apiKey.saveFailed");
+      return false;
+    }
   }
 
   function setCodexLiveVoice(codexLiveVoice: CodexLiveVoice | null): void {
@@ -345,11 +365,15 @@ export function createSettingsVoiceStore(active: () => boolean) {
       return;
     }
     const locale = currentText().locale();
+    const kokoro = state.speech.settings?.modelId === KOKORO_SPEECH_MODEL.id;
     setState((draft) => {
       draft.speech.listening = true;
     });
     try {
-      await readAloud(sample, isSpeechLanguage(locale) ? locale : "en");
+      await readAloud(
+        kokoro ? currentText().t("settings.voice.speech.model.kokoro.sample") : sample,
+        kokoro || locale === "zh" ? "zh" : isSpeechLanguage(locale) ? locale : "en",
+      );
     } catch (error) {
       fail(error, "settings.voice.speech.listenFailed");
     } finally {
@@ -377,7 +401,9 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) => void saveSpeech({ elevenLabsVoice }),
     setXaiVoice: (xaiVoice: XaiSpeechVoice) => void saveSpeech({ xaiVoice }),
     setReadReplies,
-    setCodexLive,
+    setLiveVoiceProvider,
+    setMossKey,
+    setMossLiveVoice: (mossLiveVoice: MossLiveVoice | null) => void saveSpeech({ mossLiveVoice }),
     setCodexLiveVoice,
     setSpeechVoice: (voice: SpeechVoice) =>
       void saveSpeech({ voice }).then((saved) =>

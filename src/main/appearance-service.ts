@@ -1,12 +1,16 @@
 import {
   type AppAppearancePreference,
   type AppThemePalette,
+  type AppWindowMaterial,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
+  DEFAULT_WINDOW_TRANSPARENCY,
   isAppAppearance,
   isAppFontFamily,
   isAppThemePaletteId,
+  isAppWindowMaterial,
   isChatBackgroundColor,
+  isWindowTransparency,
   type SetAppAppearancePreferenceInput,
   sameThemePalettes,
 } from "@openbot/contracts/ipc";
@@ -27,6 +31,8 @@ type StoredAppearancePreference = Pick<
   | "interfaceFont"
   | "codeFont"
 > & {
+  windowMaterial: AppWindowMaterial;
+  windowTransparency: number;
   /**
    * False until the user picks a theme in Settings: a light, dark or system choice, or a palette.
    * While it is false, `palette` is the palette that shows: the first one, also one that appears after
@@ -40,6 +46,8 @@ type StoredAppearancePreference = Pick<
 const DEFAULT_PREFERENCE: StoredAppearancePreference = {
   appearance: DEFAULT_APP_APPEARANCE,
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
+  windowMaterial: "solid",
+  windowTransparency: DEFAULT_WINDOW_TRANSPARENCY,
   palette: null,
   chatBackgroundLight: null,
   chatBackgroundDark: null,
@@ -66,6 +74,10 @@ const readAppearancePreference = Effect.fn("AppearancePreference.read")(function
       return {
         appearance: parsed.appearance,
         transparentWindow: parsed.transparentWindow === true,
+        windowMaterial: isAppWindowMaterial(parsed.windowMaterial) ? parsed.windowMaterial : "solid",
+        windowTransparency: isWindowTransparency(parsed.windowTransparency)
+          ? parsed.windowTransparency
+          : DEFAULT_WINDOW_TRANSPARENCY,
         palette: isAppThemePaletteId(parsed.palette) ? parsed.palette : null,
         chatBackgroundLight: isChatBackgroundColor(parsed.chatBackgroundLight) ? parsed.chatBackgroundLight : null,
         chatBackgroundDark: isChatBackgroundColor(parsed.chatBackgroundDark) ? parsed.chatBackgroundDark : null,
@@ -105,6 +117,7 @@ export class AppearanceService {
   readonly #path: string;
   readonly #paletteDirectory: string;
   readonly #supportsTransparentWindow: boolean;
+  readonly #supportsWindowMaterial: boolean;
   readonly #listeners = new Set<(preference: AppAppearancePreference) => void>();
   #preference: StoredAppearancePreference = { ...DEFAULT_PREFERENCE };
   #palettes: AppThemePalette[] = [];
@@ -117,10 +130,16 @@ export class AppearanceService {
    * `supportsTransparentWindow` is false where the window cannot blur the desktop: there it reads as
    * off. `paletteDirectory` is the folder of palette files.
    */
-  constructor(input: { path: string; paletteDirectory: string; supportsTransparentWindow: boolean }) {
+  constructor(input: {
+    path: string;
+    paletteDirectory: string;
+    supportsTransparentWindow: boolean;
+    supportsWindowMaterial: boolean;
+  }) {
     this.#path = input.path;
     this.#paletteDirectory = input.paletteDirectory;
     this.#supportsTransparentWindow = input.supportsTransparentWindow;
+    this.#supportsWindowMaterial = input.supportsWindowMaterial;
   }
 
   get preference(): AppAppearancePreference {
@@ -128,7 +147,11 @@ export class AppearanceService {
     const palette = this.#palettes.some((item) => item.id === wanted) ? wanted : null;
     return {
       appearance: this.#preference.appearance,
-      transparentWindow: this.#supportsTransparentWindow && this.#preference.transparentWindow,
+      transparentWindow: this.#supportsWindowMaterial
+        ? this.#preference.windowMaterial !== "solid"
+        : this.#supportsTransparentWindow && this.#preference.transparentWindow,
+      ...(this.#supportsWindowMaterial ? { windowMaterial: this.#preference.windowMaterial } : {}),
+      windowTransparency: this.#preference.windowTransparency,
       palette,
       palettes: this.#palettes.map((item) => ({ ...item, colors: { ...item.colors } })),
       chatBackgroundLight: this.#preference.chatBackgroundLight,

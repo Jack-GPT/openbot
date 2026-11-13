@@ -665,9 +665,29 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       modelSetUnsaved: options.flavor.modelSetUnsaved,
       configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
+      deleteProbe: options.flavor.deleteProbeCommand
+        ? (connection, sessionId, cwd) => this.#deleteProbe(connection, sessionId, cwd)
+        : undefined,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
     });
   }
+
+  /** Deletes only the session that model discovery opened. */
+  readonly #deleteProbe = Effect.fn("AcpAgentClient.deleteProbe")(function* (
+    this: AcpAgentClient,
+    connection: ClientSideConnection,
+    sessionId: string,
+    cwd: string,
+  ) {
+    if (this.#initialization?.agentCapabilities?.sessionCapabilities?.delete) {
+      yield* providerCall(() => connection.deleteSession({ sessionId }));
+      return;
+    }
+    // Older OpenCode versions can delete sessions with the CLI. Close the ACP session first.
+    const command = this.#flavor.deleteProbeCommand?.(sessionId);
+    yield* providerCall(() => connection.closeSession({ sessionId })).pipe(Effect.timeoutOption(1_000), Effect.ignore);
+    if (command) yield* this.#transport.run(command, 5_000, cwd);
+  });
 
   /** A process of this agent. `exit` hears an end that `stop` did not start. */
   #newTransport(exit: (error: Error) => void): AcpConnection {
