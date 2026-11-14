@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kies wat er gebeurt wanneer je het hoofdvenster in Windows sluit. Minimaliseer om OpenBot actief te houden of sluit de app volledig af."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live kan het resultaat van een lange agenttaak voorlezen zodra deze klaar is. Je kunt blijven praten terwijl de taak wordt uitgevoerd."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],

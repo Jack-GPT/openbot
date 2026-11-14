@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Choisissez ce qui se passe lorsque vous fermez la fenêtre principale sous Windows. Réduisez-la pour garder OpenBot actif, ou quittez l’application pour la fermer."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live peut lire le résultat d’une longue tâche d’agent une fois celle-ci terminée. Vous pouvez continuer à parler pendant son exécution."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],

@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Choose what happens when you close the main window on Windows. Minimize to keep OpenBot running, or quit to close it."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live can read out the result of a long agent task when it finishes. You can keep talking while the task runs."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],

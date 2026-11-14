@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Wähle, was beim Schließen des Hauptfensters unter Windows passiert. Wähle Minimieren, damit OpenBot weiterläuft, oder Beenden, um die App zu schließen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live kann das Ergebnis einer längeren Aufgabe eines Agenten vorlesen, sobald sie abgeschlossen ist. Du kannst während der Aufgabe weiter mit MOSS Live sprechen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],

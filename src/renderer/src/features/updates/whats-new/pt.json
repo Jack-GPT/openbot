@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Escolha o que acontece ao fechar a janela principal no Windows. Minimize para manter o OpenBot em execução ou saia para fechá-lo."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O MOSS Live pode ler o resultado de uma tarefa longa de um agente quando ela termina. Você pode continuar falando enquanto a tarefa é executada."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],

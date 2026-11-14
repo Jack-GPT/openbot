@@ -6,6 +6,16 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.68.3] - 2026-11-14
+
+### Added
+
+- Choose to minimize or quit when you close the Windows main window. Minimize to keep OpenBot running in the taskbar.
+
+### Fixed
+
+- In MOSS Live, long agent tasks continue while you talk. If the task takes more than two minutes, MOSS can still tell you the result when it finishes.
+
 ## [0.68.2] - 2026-11-14
 
 ### Added

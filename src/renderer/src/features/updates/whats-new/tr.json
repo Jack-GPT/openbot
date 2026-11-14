@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.68.3",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Windows'ta ana pencereyi kapattığınızda ne olacağını seçin. OpenBot'un çalışmaya devam etmesi için pencereyi küçültün veya uygulamadan çıkın."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live, uzun süren bir ajan görevi tamamlandığında sonucu sesli okuyabilir. Görev çalışırken konuşmaya devam edebilirsiniz."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.2",
     "date": "2026-11-14",
     "notices": [],
