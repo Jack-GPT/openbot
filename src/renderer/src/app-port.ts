@@ -24,6 +24,8 @@ export interface AppPort {
   getChatWindows: OpenBotDesktopApi["getChatWindows"];
   onChatWindows: OpenBotDesktopApi["onChatWindows"];
   onQuitShortcutHint: OpenBotDesktopApi["onQuitShortcutHint"];
+  onMainWindowCloseRequested: OpenBotDesktopApi["onMainWindowCloseRequested"];
+  resolveMainWindowClose: OpenBotDesktopApi["resolveMainWindowClose"];
   setAppAppearancePreference: OpenBotDesktopApi["setAppAppearancePreference"];
   setAppInterfaceSizePreference: OpenBotDesktopApi["setAppInterfaceSizePreference"];
   setAppLanguagePreference: OpenBotDesktopApi["setAppLanguagePreference"];

@@ -21,6 +21,7 @@ import {
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
+  type MainWindowCloseAction,
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
@@ -191,6 +192,7 @@ export interface MainWindowController {
   loadRenderer: (window: BrowserWindow) => Promise<void>;
   restoreMainWindowBounds: () => Effect.Effect<void>;
   flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
+  resolveMainWindowClose: (action: MainWindowCloseAction) => void;
   /**
    * For a view in a window, such as the browser dock: true when the key is part of `Cmd + Q`, and
    * the view must then stop it. See `createQuitShortcut`.
@@ -236,6 +238,7 @@ export function createMainWindowController({
       reportError,
     });
   let rendererReloadTimes: number[] = [];
+  let closePromptWindow: BrowserWindow | null = null;
 
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
@@ -291,7 +294,31 @@ export function createMainWindowController({
         window.show();
       }
     });
+    const clearClosePrompt = () => {
+      if (closePromptWindow === window) closePromptWindow = null;
+    };
+    let rendererResponsive = true;
+    window.on("unresponsive", () => {
+      rendererResponsive = false;
+      clearClosePrompt();
+    });
+    window.on("responsive", () => {
+      rendererResponsive = true;
+    });
     window.on("close", (event) => {
+      if (
+        process.platform === "win32" &&
+        !isQuitting() &&
+        window.isVisible() &&
+        rendererResponsive &&
+        !window.webContents.isCrashed() &&
+        sendToRenderer(window, IPC_ENDPOINTS.app.mainWindowCloseRequested)
+      ) {
+        closePromptWindow = window;
+        event.preventDefault();
+        return;
+      }
+      clearClosePrompt();
       rememberMainWindowBounds(window.getNormalBounds());
       // Nobody can use a tab without the window, so the agents waiting on it continue.
       getServices()?.browser.releaseUserControlHeldBy({ kind: "local" });
@@ -306,6 +333,7 @@ export function createMainWindowController({
     });
     onMainWindowCreated(window);
     window.on("closed", () => {
+      clearClosePrompt();
       if (holder.current === window) holder.current = null;
       // A chat window is a second view of a chat in the main window, so it does not outlive it.
       for (const chat of chatWindows.values()) chat.window.close();
@@ -314,6 +342,13 @@ export function createMainWindowController({
     window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
 
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    window.webContents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) {
+        clearClosePrompt();
+        rendererResponsive = true;
+      }
+    });
+    window.webContents.on("render-process-gone", clearClosePrompt);
     // A started navigation can still be cancelled without replacing the live renderer.
     window.webContents.on("did-navigate", onRendererLoadStarted);
     // Chromium keeps a zoom level for each origin, and the first load sets the origin, so the saved
@@ -492,6 +527,13 @@ export function createMainWindowController({
     loadRenderer,
     restoreMainWindowBounds,
     flushMainWindowBounds,
+    resolveMainWindowClose: (action) => {
+      const window = closePromptWindow;
+      if (!window || window !== holder.current || window.isDestroyed() || isQuitting()) return;
+      closePromptWindow = null;
+      if (action === "minimize") window.minimize();
+      if (action === "quit") app.quit();
+    },
     handleQuitShortcut: (window, input) => quitShortcut?.handleInput(window, input) ?? false,
   };
 }

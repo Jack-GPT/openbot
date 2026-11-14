@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { MossLiveControl, MossLiveEvent, MossLiveVoice } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -7,12 +8,13 @@ import WebSocket, { type RawData } from "ws";
 import { rawDataBytes, rawDataText } from "./ws-raw-data";
 
 const URL = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
-const TOOL = "ask_agent";
 const OPEN_TIMEOUT_MS = 15_000;
 const KEEPALIVE_MS = 15_000;
 const MAX_RETRY_DELAY_MS = 15_000;
 const MAX_BUFFERED_AUDIO_BYTES = 64_000;
 const MAX_PENDING_PLAYBACK_RECEIPTS = 512;
+const MAX_DELEGATION_RESULT_LENGTH = 2_000;
+const MAX_SEEN_DELEGATIONS = 2_000;
 const logger = createOpenBotLogger("moss-live");
 const REQUEST_ERRORS = new Set([
   "content_too_long",
@@ -38,6 +40,16 @@ const VOICE_IDS: Record<MossLiveVoice, string> = {
 };
 type AudioChunk = Pick<Extract<MossLiveEvent, { type: "audio" }>, "runId" | "turnId" | "chunkId">;
 type PlaybackReceipt = Extract<MossLiveControl, { runId: string }>;
+type Delegation = {
+  readonly startedAt: number;
+  result?: {
+    action: "session.commentary.append";
+    delegation_id: string;
+    event_id: string;
+    content: string;
+    status: "completed" | "failed";
+  };
+};
 export type MossStopReason =
   | "stopped"
   | "replaced"
@@ -52,10 +64,8 @@ export class MossLiveSession {
   readonly #emit: (event: MossLiveEvent) => void;
   readonly #voiceId: string | null;
   readonly #open: () => WebSocket;
-  readonly #calls = new Map<string, ReturnType<typeof setTimeout>>();
-  readonly #answers = new Set<string>();
-  readonly #pendingAnswers = new Map<string, string>();
-  readonly #seenCalls = new Set<string>();
+  readonly #delegations = new Map<string, Delegation>();
+  readonly #seenDelegations = new Set<string>();
   readonly #playbackReceipts: PlaybackReceipt[] = [];
   #socket: WebSocket | undefined;
   #chunk: AudioChunk | undefined;
@@ -118,7 +128,9 @@ export class MossLiveSession {
       this.#disconnect("setup-timeout");
     }, OPEN_TIMEOUT_MS);
     socket.on("open", () => {
-      if (this.#socket === socket) this.#send({ action: "attach_session", session_id: this.#resumeId });
+      if (this.#socket === socket) {
+        this.#send({ action: "attach_session", session_id: this.#resumeId, delegation: { type: "client" } });
+      }
     });
     socket.on("message", (data, binary) => {
       if (this.#socket === socket) this.#receive(data, binary);
@@ -160,22 +172,28 @@ export class MossLiveSession {
       return;
     }
     if (input.action === "answer") {
-      if (!this.#finishCall(input.callId)) return;
-      const text = redactText(input.text);
-      if (this.#phase === "ready") this.#sendAnswer(input.callId, text);
-      else this.#pendingAnswers.set(input.callId, text);
+      const delegation = this.#delegations.get(input.callId);
+      if (!delegation || delegation.result) return;
+      const text = redactText(input.text).trim();
+      const failed = input.failed === true || !text;
+      delegation.result = {
+        action: "session.commentary.append",
+        delegation_id: input.callId,
+        event_id: randomUUID(),
+        content: text
+          ? Array.from(text).slice(0, MAX_DELEGATION_RESULT_LENGTH).join("")
+          : "The agent returned no result.",
+        status: failed ? "failed" : "completed",
+      };
+      logger.info("MOSS Live delegation finished locally.", {
+        elapsedMs: Date.now() - delegation.startedAt,
+        failed,
+      });
+      if (this.#phase === "ready") this.#send(delegation.result);
       return;
     }
     if (this.#phase === "ready") this.#sendReceipt(input);
     else if (this.#playbackReceipts.length < MAX_PENDING_PLAYBACK_RECEIPTS) this.#playbackReceipts.push(input);
-  }
-
-  #sendAnswer(callId: string, text: string): void {
-    this.#answers.add(callId);
-    this.#send({
-      action: "conversation.item.create",
-      item: { type: "function_call_output", call_id: callId, output: text },
-    });
   }
 
   #sendReceipt(input: PlaybackReceipt): void {
@@ -201,14 +219,11 @@ export class MossLiveSession {
   }
 
   #clearSession(notify: boolean): void {
-    for (const [callId, timer] of this.#calls) {
-      clearTimeout(timer);
-      if (notify) this.#emit({ type: "cancel", callId });
+    for (const [callId, delegation] of this.#delegations) {
+      if (notify && !delegation.result) this.#emit({ type: "cancel", callId });
     }
-    this.#calls.clear();
-    this.#answers.clear();
-    this.#pendingAnswers.clear();
-    this.#seenCalls.clear();
+    this.#delegations.clear();
+    this.#seenDelegations.clear();
     this.#playbackReceipts.length = 0;
   }
 
@@ -232,18 +247,8 @@ export class MossLiveSession {
       action: "session.update",
       session: {
         instructions:
-          "Speak naturally in the user's language. Answer casual conversation and general questions directly. Use ask_agent only when the user explicitly asks you to involve the selected agent or requests work that needs the agent, such as reading project files or taking action in the workspace. Call the tool without announcing the handoff, OpenBot, or the tool name. If the task takes time and a reply is needed, briefly say you are checking. When the result arrives, share it naturally. Report success only after the tool confirms it.",
-        tools: [
-          {
-            type: "function",
-            name: TOOL,
-            description:
-              "Ask the selected workspace agent to perform the requested work or check workspace information.",
-            execution_mode: "async_effect",
-            read_only: false,
-            parameters: { type: "object", properties: { request: { type: "string" } }, required: ["request"] },
-          },
-        ],
+          "Speak naturally in the user's language. Answer casual conversation and general questions directly. Delegate a background task only when the user explicitly asks you to involve the selected agent or requests work that needs it, such as reading project files or taking action in the workspace. Put the user's request and relevant details in the objective. Start work without announcing the handoff or naming OpenBot. If the task takes time, briefly say you are checking and keep the conversation open. When the result arrives, share it naturally. Only report success after you receive the result.",
+        tools: [],
       },
     });
   }
@@ -296,8 +301,7 @@ export class MossLiveSession {
       if (this.#micEnabled !== undefined) this.control({ action: "mic", enabled: this.#micEnabled });
       for (const receipt of this.#playbackReceipts) this.#sendReceipt(receipt);
       this.#playbackReceipts.length = 0;
-      for (const [callId, text] of this.#pendingAnswers) this.#sendAnswer(callId, text);
-      this.#pendingAnswers.clear();
+      for (const { result } of this.#delegations.values()) if (result) this.#send(result);
       this.#emit({ type: "reconnected", resumed: this.#resumed });
     }
     this.#connected = true;
@@ -338,6 +342,11 @@ export class MossLiveSession {
     switch (value.action) {
       case "session_attached":
         if (this.#phase !== "attaching") return;
+        if (data.delegation !== "client") {
+          this.#sessionId = null;
+          this.#disconnect("delegation-unavailable");
+          return;
+        }
         this.#sessionId = typeof data.session_id === "string" && data.session_id ? data.session_id : null;
         this.#resumed = this.#sessionId !== null && this.#sessionId === this.#resumeId;
         if (this.#voiceId === null) this.#configure();
@@ -412,68 +421,52 @@ export class MossLiveSession {
       case "response.interrupted":
         logger.info("MOSS Live interrupted a reply.", this.#activity());
         return;
-      case "response.function_call_arguments.done":
-        this.#tool(data);
+      case "session.delegation.created":
+        this.#delegate(data);
         return;
-      case "response.done":
-        if (isDynamicRecord(data.response) && Array.isArray(data.response.output)) {
-          for (const item of data.response.output) {
-            if (isDynamicRecord(item) && item.type === "function_call") this.#tool(item);
-          }
-        }
+      case "session.delegation.cancelled": {
+        const callId = data.delegation_id;
+        if (typeof callId !== "string") return;
+        const delegation = this.#delegations.get(callId);
+        if (!delegation) return;
+        this.#delegations.delete(callId);
+        logger.info("MOSS Live cancelled a delegation.", { elapsedMs: Date.now() - delegation.startedAt });
+        if (!delegation.result) this.#emit({ type: "cancel", callId });
         return;
-      case "response.function_call.cancel_requested":
-        if (typeof data.call_id === "string" && this.#finishCall(data.call_id))
-          this.#emit({ type: "cancel", callId: data.call_id });
-        return;
-      case "conversation.item.created": {
-        const item = data.item;
-        if (
-          isDynamicRecord(item) &&
-          item.type === "function_call_output" &&
-          typeof item.call_id === "string" &&
-          this.#answers.delete(item.call_id)
-        )
-          this.#send({ action: "response.create", response: { call_ids: [item.call_id] } });
+      }
+      case "session.commentary.appended": {
+        const callId = data.delegation_id;
+        if (typeof callId !== "string") return;
+        const result = this.#delegations.get(callId)?.result;
+        if (result && result.event_id === data.client_event_id) this.#delegations.delete(callId);
       }
     }
   }
 
-  #tool(data: DynamicRecord): void {
-    const { call_id: callId, arguments: args } = data;
+  #delegate(data: DynamicRecord): void {
+    const delegation = data.delegation;
+    if (!isDynamicRecord(delegation) || delegation.target !== "client") return;
+    const { id: callId } = delegation;
+    const { objective } = data;
     if (
       this.#phase !== "ready" ||
-      data.name !== TOOL ||
       typeof callId !== "string" ||
       !callId ||
       callId.length > 256 ||
-      typeof args !== "string" ||
-      args.length > 16_000 ||
-      this.#seenCalls.has(callId) ||
-      this.#seenCalls.size >= 2_000
+      typeof objective !== "string" ||
+      !objective.trim() ||
+      this.#seenDelegations.has(callId) ||
+      this.#delegations.has(callId)
     )
       return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(args);
-    } catch {
-      return;
+    this.#seenDelegations.add(callId);
+    if (this.#seenDelegations.size > MAX_SEEN_DELEGATIONS) {
+      const oldest = this.#seenDelegations.values().next().value;
+      if (oldest !== undefined) this.#seenDelegations.delete(oldest);
     }
-    if (!isDynamicRecord(parsed) || typeof parsed.request !== "string" || !parsed.request.trim()) return;
-    this.#seenCalls.add(callId);
-    const timer = setTimeout(() => {
-      this.control({ action: "answer", callId, text: "The agent did not respond in time." });
-      this.#emit({ type: "cancel", callId });
-    }, 120_000);
-    this.#calls.set(callId, timer);
-    this.#emit({ type: "request", callId, text: parsed.request.slice(0, 8_000) });
-  }
-
-  #finishCall(callId: string): boolean {
-    const timer = this.#calls.get(callId);
-    if (timer === undefined) return false;
-    clearTimeout(timer);
-    return this.#calls.delete(callId);
+    logger.info("MOSS Live started a delegation.", { active: this.#delegations.size + 1 });
+    this.#delegations.set(callId, { startedAt: Date.now() });
+    this.#emit({ type: "request", callId, text: objective.slice(0, 8_000) });
   }
 }
 

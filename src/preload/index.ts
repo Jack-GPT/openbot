@@ -798,6 +798,8 @@ const openbotApi: OpenBotDesktopApi = {
     getChatWindows: decodeChatWindowTargets,
     chatWindows: decodeChatWindowTargets,
     quitShortcutHint: decodeQuitShortcutHint,
+    mainWindowCloseRequested: decodeVoid,
+    resolveMainWindowClose: decodeVoid,
   }),
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,

@@ -34,7 +34,10 @@ export type MossLivePort = Pick<
 
 export function createMossLiveConversation(
   voice: MossLivePort,
-  agent: Pick<OpenBotDesktopApi["agent"], "sendMessage" | "listQueue" | "readConversationPage" | "onScopedEvent">,
+  agent: Pick<
+    OpenBotDesktopApi["agent"],
+    "sendMessage" | "listQueue" | "readConversationPage" | "onScopedEvent" | "cancelQueuedMessage"
+  >,
   target: { agentId: string; serverId: string },
 ) {
   const [state, setState] = createStore<MossLiveState>({
@@ -145,6 +148,7 @@ export function createMossLiveConversation(
 
   async function askAgent(text: string, signal: AbortSignal): Promise<string> {
     const { agentId, serverId } = target;
+    let deliveryId: string | undefined;
     let wake: (() => void) | undefined;
     const onEvent = agent.onScopedEvent(({ serverId: sender, event }) => {
       if (sender !== serverId) return;
@@ -158,7 +162,7 @@ export function createMossLiveConversation(
     signal.addEventListener("abort", abort, { once: true });
     try {
       const receipt = await agent.sendMessage({ agentId, text }, serverId);
-      const deliveryId = receipt.deliveries[0]?.id;
+      deliveryId = receipt.deliveries[0]?.id;
       if (!deliveryId) throw new Error("No delivery.");
       while (!signal.aborted) {
         const changed = new Promise<void>((resolve) => {
@@ -180,6 +184,9 @@ export function createMossLiveConversation(
     } finally {
       onEvent();
       signal.removeEventListener("abort", abort);
+      // The delivery may have joined an existing turn. Cancel only a message still in the queue.
+      if (deliveryId && signal.reason === "delegation-cancelled")
+        void agent.cancelQueuedMessage({ agentId, deliveryId }, serverId).catch(() => undefined);
     }
   }
 
@@ -260,7 +267,7 @@ export function createMossLiveConversation(
         stopPlayback(event.runId, event.turnId);
         return;
       case "cancel":
-        pending.get(event.callId)?.abort();
+        pending.get(event.callId)?.abort("delegation-cancelled");
         return;
       case "request": {
         if (!active || pending.has(event.callId)) return;
@@ -273,7 +280,12 @@ export function createMossLiveConversation(
           })
           .catch(() => {
             if (!call.signal.aborted)
-              control({ action: "answer", callId: event.callId, text: "The agent could not complete this request." });
+              control({
+                action: "answer",
+                callId: event.callId,
+                text: "The agent could not complete this request.",
+                failed: true,
+              });
           })
           .finally(() => {
             pending.delete(event.callId);

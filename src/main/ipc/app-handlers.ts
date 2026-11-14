@@ -15,6 +15,7 @@ import {
   type ExternalLinkBrowser,
   externalLinkAppName,
   GROK_BOT_EXPORT_URL,
+  type MainWindowCloseAction,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { analyticsOnByDefault } from "@openbot/telemetry";
@@ -58,6 +59,7 @@ import {
   parseChatWindowTarget,
   parseExternalDestination,
   parseExternalLinkPreference,
+  parseMainWindowCloseAction,
   parseRemoteNetworkRoutePreference,
   parseRemoteSessionReusePreference,
   parseRendererTimingReport,
@@ -124,7 +126,13 @@ import { openHttpLink } from "../message-link-relay";
 import type { ResourceMonitor } from "../resource-monitor";
 import type { StartupTiming } from "../startup-timing";
 import type { TraceFile } from "../trace-file";
-import { eventPayloadHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import {
+  authorizedHandler,
+  eventPayloadHandler,
+  handler,
+  type IpcGroupHandlers,
+  payloadHandler,
+} from "./define-ipc-group";
 
 export interface AppIpcDependencies {
   service: AgentService;
@@ -158,6 +166,7 @@ export interface AppIpcDependencies {
   getMainWindow: () => BrowserWindow | null;
   /** True for the main window's own `webContents`, not a chat window's. */
   isMainWindow: (sender: WebContents) => boolean;
+  resolveMainWindowClose: (action: MainWindowCloseAction) => void;
   openChatWindow: (target: ChatWindowTarget) => void;
   chatWindowTargets: () => ChatWindowTarget[];
   trace: TraceFile;
@@ -195,6 +204,7 @@ export function appIpcHandlers({
   analyticsInstallId,
   getMainWindow,
   isMainWindow,
+  resolveMainWindowClose,
   openChatWindow,
   chatWindowTargets,
   trace,
@@ -350,6 +360,14 @@ export function appIpcHandlers({
       }),
       openChatWindow: payloadHandler(parseChatWindowTarget, openChatWindow),
       getChatWindows: handler(chatWindowTargets),
+      resolveMainWindowClose: authorizedHandler(
+        (event) => {
+          if (!isMainWindow(event.sender) || event.senderFrame?.parent !== null)
+            throw new Error("Only the main window can answer its close prompt.");
+        },
+        parseMainWindowCloseAction,
+        (_event, action) => resolveMainWindowClose(action),
+      ),
     },
     maintenance: {
       exportData: handler(() =>

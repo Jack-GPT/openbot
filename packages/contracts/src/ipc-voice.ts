@@ -595,7 +595,7 @@ export interface VoiceLiveStop {
 export type MossLiveControl =
   | { action: "mic"; enabled: boolean }
   | { action: "played" | "stopped" | "completed"; runId: string; turnId: string; chunkId?: string; playedMs?: number }
-  | { action: "answer"; callId: string; text: string };
+  | { action: "answer"; callId: string; text: string; failed?: true };
 
 export const DEFAULT_VOICE_SHORTCUT = "Alt+V";
 

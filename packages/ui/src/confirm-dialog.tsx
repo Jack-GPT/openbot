@@ -38,6 +38,8 @@ export interface ConfirmDialogProps {
   /** Replaces the confirm label while pending, such as "Deleting…". */
   pendingLabel?: string;
   cancelLabel?: string;
+  /** An optional action between Cancel and Confirm. */
+  secondaryAction?: JSX.Element;
   /** Marks the dialog pending in addition to a pending `onConfirm` promise. */
   pending?: boolean;
   error?: JSX.Element;
@@ -163,6 +165,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                   {props.cancelLabel ?? t("common.cancel")}
                 </Button>
               </Show>
+              {props.secondaryAction}
               <Button
                 ref={(element: HTMLButtonElement) => {
                   confirmButton = element;

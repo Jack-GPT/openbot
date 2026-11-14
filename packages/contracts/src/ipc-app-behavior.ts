@@ -9,6 +9,8 @@ export const QUIT_GUARDS = ["working", "always", "never"] as const;
 export type QuitGuard = (typeof QUIT_GUARDS)[number];
 export const DEFAULT_QUIT_GUARD: QuitGuard = "working";
 
+export type MainWindowCloseAction = "cancel" | "minimize" | "quit";
+
 /** As it crosses IPC. Null marks a choice that this run of the app does not offer. */
 export interface AppBehaviorPreference {
   /** Open OpenBot when the user signs in. Null in a development run and on a server. */

@@ -5,4 +5,6 @@ export const messages = {
   "window.localHostTitle": "OpenBot Yerel Ana Makine",
   "window.localClientTitle": "OpenBot Yerel İstemci",
   "window.computerUsePermissionTitle": "Bilgisayar Kullanımını aç",
+  "window.closePrompt": "OpenBot küçültülsün mü yoksa kapatılsın mı?",
+  "window.minimize": "Küçült",
 } as const satisfies PartialTranslation<typeof source>;

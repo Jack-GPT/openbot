@@ -10,6 +10,7 @@ export interface ConversationPort {
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"
     | "askSideQuestion"
+    | "cancelQueuedMessage"
     | "saveSkillSuggestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"

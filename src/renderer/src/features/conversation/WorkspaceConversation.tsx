@@ -54,6 +54,7 @@ import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
+import { mainWindowCloseDialogOpen } from "../window/MainWindowCloseDialog";
 import { useWindowPage } from "../window/window-page-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
@@ -638,6 +639,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
           hasVisibleToasts() ||
+          mainWindowCloseDialogOpen() ||
           quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}

@@ -26,6 +26,7 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
+import { mainWindowCloseDialogOpen } from "../window/MainWindowCloseDialog";
 import { useWindowPage } from "../window/window-page-context";
 import { ChannelErrorNotice } from "./ChannelConversationParts";
 import { createChannelConversation } from "./channel-conversation";
@@ -172,6 +173,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
         hasVisibleToasts() ||
+        mainWindowCloseDialogOpen() ||
         quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}

@@ -28,6 +28,7 @@ import type {
   InstallSkillInput,
   MacAutomationTarget,
   MacPermissionId,
+  MainWindowCloseAction,
   MarketplaceAgentQuery,
   MarketplaceSkillQuery,
   MarketplaceSkillSort,
@@ -104,6 +105,11 @@ import { validateProfileName } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, optionalBoolean, requireString } from "./validation";
+
+export function parseMainWindowCloseAction(input: unknown): MainWindowCloseAction {
+  if (input === "cancel" || input === "minimize" || input === "quit") return input;
+  throw new Error("Invalid main window close action.");
+}
 
 export function parseSetup(input: unknown): SaveSetupInput {
   if (!isDynamicRecord(input)) throw new Error("Setup input is required.");

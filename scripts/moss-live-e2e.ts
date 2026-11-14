@@ -29,6 +29,15 @@ const run = { run_id: "run-1", turn_id: "turn-1" };
 const attachIds: Array<string | null> = [];
 const recovery = new EventTarget();
 let connectionNumber = 0;
+let resultEventId: string | undefined;
+const sendEvent = (socket: WebSocket, action: string, data: DynamicRecord) =>
+  socket.send(JSON.stringify({ action, data }));
+const delegate = (socket: WebSocket, id: string) =>
+  sendEvent(socket, "session.delegation.created", {
+    delegation: { id, target: "client" },
+    objective: "Check the workspace.",
+    timeout_ms: 1,
+  });
 server.on("connection", (socket, request) => {
   const connection = ++connectionNumber;
   assert.equal(request.headers.authorization, "Bearer smoke-key");
@@ -39,14 +48,7 @@ server.on("connection", (socket, request) => {
       assert.equal(raw.toString("hex"), "01000200");
       send({ action: "input.transcript.done", data: { text: "你好" } });
       if (connection !== 1) return;
-      send({
-        action: "response.function_call_arguments.done",
-        data: {
-          name: "ask_agent",
-          call_id: "call-1",
-          arguments: JSON.stringify({ request: "你好" }),
-        },
-      });
+      delegate(socket, "call-1");
       return;
     }
     const message = JSON.parse(raw.toString());
@@ -54,6 +56,7 @@ server.on("connection", (socket, request) => {
     controls.push(message.action);
     switch (message.action) {
       case "attach_session": {
+        assert.deepEqual(message.delegation, { type: "client" });
         const id = message.session_id;
         assert.ok(id === null || typeof id === "string");
         attachIds.push(id);
@@ -63,7 +66,7 @@ server.on("connection", (socket, request) => {
         }
         send({
           action: "session_attached",
-          data: { session_id: connection === 1 ? "moss-smoke" : (id ?? "new-smoke") },
+          data: { session_id: connection === 1 ? "moss-smoke" : (id ?? "new-smoke"), delegation: "client" },
         });
         break;
       }
@@ -78,6 +81,7 @@ server.on("connection", (socket, request) => {
         assert.ok(isDynamicRecord(message.session) && Array.isArray(message.session.tools));
         assert.match(String(message.session.instructions), /general questions directly/u);
         assert.match(String(message.session.instructions), /without announcing the handoff/u);
+        assert.deepEqual(message.session.tools, []);
         send({ action: "session.updated", data: { error: "" } });
         break;
       case "mic_state":
@@ -86,16 +90,19 @@ server.on("connection", (socket, request) => {
           recovery.dispatchEvent(new Event(`mic-${connection}`));
         }
         break;
-      case "conversation.item.create":
-        assert.ok(isDynamicRecord(message.item));
-        assert.equal(message.item.call_id, "call-1");
-        assert.equal(message.item.output, "你好，我是 OpenBot。");
+      case "session.commentary.append":
+        assert.equal(message.delegation_id, "call-1");
+        assert.equal(message.content, "你好，我是 OpenBot。");
+        assert.equal(message.status, "completed");
+        assert.equal(typeof message.event_id, "string");
+        if (resultEventId) assert.equal(message.event_id, resultEventId);
+        else resultEventId = String(message.event_id);
+        recovery.dispatchEvent(new Event(`result-${connection}`));
+        if (connection === 1) return;
         send({
-          action: "conversation.item.created",
-          data: { item: { type: "function_call_output", call_id: "call-1" } },
+          action: "session.commentary.appended",
+          data: { delegation_id: "call-1", client_event_id: message.event_id },
         });
-        break;
-      case "response.create":
         send({ action: "output.transcript.done", data: { text: "你好，我是 OpenBot。" } });
         send({ action: "response.audio.context", data: { ...run, chunk_id: "chunk-1" } });
         socket.send(Buffer.from([1, 0, 2, 0]));
@@ -113,8 +120,6 @@ const session = new MossLiveSession(
   (event) => {
     events.push(event);
     recovery.dispatchEvent(new Event(event.type));
-    if (event.type === "request")
-      session.control({ action: "answer", callId: event.callId, text: "你好，我是 OpenBot。" });
     if (event.type === "audio") {
       assert.deepEqual([...event.pcm], [1, 0, 2, 0]);
       session.control({ action: "played", runId: event.runId, turnId: event.turnId, chunkId: event.chunkId });
@@ -126,47 +131,80 @@ const session = new MossLiveSession(
 try {
   await Effect.runPromise(session.ready);
   session.control({ action: "mic", enabled: true });
+  const request = once(recovery, "request");
   session.audio(new Uint8Array([1, 0, 2, 0]));
+  await Promise.race([request, timer]);
+  const first = [...server.clients][0];
+  assert.ok(first);
+  const heardWhileWaiting = once(recovery, "transcript");
+  delegate(first, "call-1");
+  sendEvent(first, "input.transcript.done", { text: "still talking" });
+  await Promise.race([heardWhileWaiting, timer]);
+  const delegation = events.find((event) => event.type === "request");
+  assert.deepEqual(delegation, { type: "request", callId: "call-1", text: "Check the workspace." });
+  assert.equal(events.filter((event) => event.type === "request").length, 1);
+  assert.equal(
+    events.some((event) => event.type === "cancel"),
+    false,
+  );
+  const firstResult = once(recovery, "result-1");
+  session.control({ action: "answer", callId: "call-1", text: "你好，我是 OpenBot。" });
+  await Promise.race([firstResult, timer]);
+  const restored = Promise.all([once(recovery, "reconnected"), once(recovery, "mic-2"), once(recovery, "result-2")]);
+  first.terminate();
+  await Promise.race([restored, timer]);
   await Promise.race([done, timer]);
   assert.deepEqual(
     events.map((event) => event.type),
-    ["transcript", "request", "transcript", "audio", "done"],
+    ["transcript", "request", "transcript", "reconnecting", "reconnected", "transcript", "audio", "done"],
   );
   assert.deepEqual(controls, [
     "attach_session",
     ...(voice ? ["change_voice"] : []),
     "session.update",
     "mic_state",
-    "conversation.item.create",
-    "response.create",
+    "session.commentary.append",
+    "attach_session",
+    ...(voice ? ["change_voice"] : []),
+    "session.update",
+    "mic_state",
+    "session.commentary.append",
     "playback.chunk.completed",
     "playback.completed",
   ]);
 
-  const first = [...server.clients][0];
-  assert.ok(first);
+  const second = [...server.clients][0];
+  assert.ok(second);
+  const cancelledRequest = once(recovery, "request");
+  delegate(second, "cancelled-call");
+  await Promise.race([cancelledRequest, timer]);
+  const cancelled = once(recovery, "cancel");
+  sendEvent(second, "session.delegation.cancelled", { delegation_id: "cancelled-call" });
+  await Promise.race([cancelled, timer]);
+  session.control({ action: "answer", callId: "cancelled-call", text: "Do not deliver." });
   const afterRequestError = once(recovery, "transcript");
-  first.send(JSON.stringify({ action: "error", data: { error: { code: "invalid_public_request" } } }));
-  first.send(JSON.stringify({ action: "input.transcript.done", data: { text: "still connected" } }));
+  second.send(JSON.stringify({ action: "error", data: { error: { code: "invalid_public_request" } } }));
+  second.send(JSON.stringify({ action: "input.transcript.done", data: { text: "still connected" } }));
   await Promise.race([afterRequestError, timer]);
   assert.equal(
     events.some((event) => event.type === "ended"),
     false,
   );
 
-  const restored = Promise.all([once(recovery, "reconnected"), once(recovery, "mic-2")]);
-  first.terminate();
-  await Promise.race([restored, timer]);
-  assert.deepEqual(events.at(-1), { type: "reconnected", resumed: true });
   const afterReconnect = once(recovery, "transcript");
   session.audio(new Uint8Array([1, 0, 2, 0]));
   await Promise.race([afterReconnect, timer]);
 
-  const second = [...server.clients][0];
-  assert.ok(second);
+  assert.equal(controls.filter((action) => action === "session.commentary.append").length, 2);
+  const outstandingRequest = once(recovery, "request");
+  delegate(second, "pending-on-replacement");
+  await Promise.race([outstandingRequest, timer]);
+  const lostDelegation = once(recovery, "cancel");
   const replaced = Promise.all([once(recovery, "reconnected"), once(recovery, "mic-4")]);
   second.terminate();
   await Promise.race([replaced, timer]);
+  await Promise.race([lostDelegation, timer]);
+  assert.ok(events.some((event) => event.type === "cancel" && event.callId === "pending-on-replacement"));
   assert.deepEqual(events.at(-1), { type: "reconnected", resumed: false });
   assert.deepEqual(attachIds, [null, "moss-smoke", "moss-smoke", null]);
 

@@ -1433,6 +1433,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     onChatWindows: () => () => undefined,
     // Main reads Cmd + Q, and the preview has no main process.
     onQuitShortcutHint: () => () => undefined,
+    onMainWindowCloseRequested: () => () => undefined,
+    resolveMainWindowClose: async () => undefined,
     // The preview has no native page, so the overlay is never on screen and the DOM dock stays.
     browserDock: {
       publishPresentation: async () => undefined,

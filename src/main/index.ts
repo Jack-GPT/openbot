@@ -898,6 +898,7 @@ function registerIpcHandlers({
         return window !== null && !window.isDestroyed() && window.webContents === sender;
       },
       openChatWindow: windows.openChatWindow,
+      resolveMainWindowClose: windows.resolveMainWindowClose,
       chatWindowTargets: windows.chatWindowTargets,
       trace,
       resources: resourceMonitor,

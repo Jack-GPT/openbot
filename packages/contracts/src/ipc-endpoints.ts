@@ -198,7 +198,7 @@ import type {
   UpdateStatus,
   VerifyEmailCodeInput,
 } from "./ipc-app-auth";
-import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
+import type { AppBehaviorPreference, AppBehaviorPreferenceChange, MainWindowCloseAction } from "./ipc-app-behavior";
 import type {
   ApprovalAutomationPreference,
   RespondToApprovalInput,
@@ -831,6 +831,8 @@ export const IPC_ENDPOINTS = {
     // the key must be held or pressed twice. The hint names the local agents that work, which a quit
     // stops, and is empty when the user guards every quit and no agent works. Null removes it.
     quitShortcutHint: event<ClientAgentSummary[] | null>()("app:quit-shortcut-hint"),
+    mainWindowCloseRequested: event<undefined>()("app:main-window-close-requested"),
+    resolveMainWindowClose: request<MainWindowCloseAction, void>()("app:resolve-main-window-close"),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()("maintenance:export-data"),

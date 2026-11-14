@@ -187,8 +187,14 @@ export function parseMossControl(input: unknown): MossLiveControl {
   const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 256;
   if (isObject(input)) {
     if (input.action === "mic" && typeof input.enabled === "boolean") return { action: "mic", enabled: input.enabled };
-    if (input.action === "answer" && id(input.callId) && typeof input.text === "string" && input.text.length <= 16_000)
-      return { action: "answer", callId: input.callId, text: input.text };
+    if (
+      input.action === "answer" &&
+      id(input.callId) &&
+      typeof input.text === "string" &&
+      input.text.length <= 16_000 &&
+      (input.failed === undefined || input.failed === true)
+    )
+      return { action: "answer", callId: input.callId, text: input.text, ...(input.failed && { failed: true }) };
     if (id(input.runId) && id(input.turnId)) {
       const { runId, turnId } = input;
       if (input.action === "completed") return { action: "completed", runId, turnId };
