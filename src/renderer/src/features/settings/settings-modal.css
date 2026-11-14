@@ -9,6 +9,45 @@
   gap: var(--openbot-space-2);
 }
 
+.settings-shortcuts-list > .settings-shortcut-row {
+  min-height: var(--openbot-control-lg);
+  padding-block: var(--openbot-space-2);
+}
+
+.settings-shortcuts-reset {
+  justify-self: end;
+}
+
+.settings-shortcut-row > .ui-item-actions {
+  justify-content: flex-end;
+}
+
+.settings-shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.settings-shortcut-trigger {
+  display: inline-flex;
+  height: auto;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--openbot-radius-xs);
+  background: transparent;
+}
+
+.settings-shortcut-trigger:focus-visible,
+.settings-shortcut-trigger[aria-pressed="true"] {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.settings-shortcut-trigger:not(:disabled):hover .ui-kbd {
+  color: var(--openbot-text-primary);
+}
+
 .settings-dynamic-island-size > .ui-slider-field,
 .settings-dynamic-island-preview,
 .settings-agent-dock-size {

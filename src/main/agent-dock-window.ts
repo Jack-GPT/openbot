@@ -11,6 +11,7 @@ import type {
   AgentDockEdge,
   AgentDockInputRect,
   AgentDockPresentation,
+  AgentDockSeatRef,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_DOCK_LIMITS, AGENT_DOCK_SIZE_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
@@ -80,6 +81,7 @@ export class AgentDockWindowController {
    * another dock opened one does not close that chat.
    */
   #chatOwner: number | null = null;
+  #chatTarget: { serverId: string; seat: AgentDockSeatRef } | null = null;
   /** One send per draft, shared by the retries that send it again. */
   readonly #sends = new Map<string, Deferred.Deferred<void, AgentDockFailed>>();
   readonly #reconciliation = Semaphore.makeUnsafe(1);
@@ -106,6 +108,24 @@ export class AgentDockWindowController {
 
   get dockRendererIds(): ReadonlySet<number> {
     return new Set(this.#liveWindows().map(({ rendererId }) => rendererId));
+  }
+
+  get openChat() {
+    const owner = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
+    return owner && this.#chatTarget ? { window: owner.window, ...this.#chatTarget } : null;
+  }
+
+  openVoiceFromShortcut(): boolean {
+    const docks = this.#liveWindows();
+    if (docks.length === 0) return false;
+    const window = this.#options.getMainWindow();
+    const display =
+      window && !window.isDestroyed()
+        ? this.#options.screen.getDisplayMatching(window.getBounds())
+        : this.#options.screen.getPrimaryDisplay();
+    const dock =
+      this.openChat?.window ?? docks.find((entry) => entry.displayId === display.id)?.window ?? docks[0]?.window;
+    return sendToRenderer(dock, IPC_ENDPOINTS.voice.shortcut);
   }
 
   #liveWindows(): DockWindow[] {
@@ -186,6 +206,7 @@ export class AgentDockWindowController {
     main.webContents.on("did-finish-load", () => {
       const owner = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
       this.#chatOwner = null;
+      this.#chatTarget = null;
       if (owner) sendToRenderer(owner.window, IPC_ENDPOINTS.agentDock.closeChat);
     });
   }
@@ -301,6 +322,7 @@ export class AgentDockWindowController {
           sendToRenderer(previous.window, IPC_ENDPOINTS.agentDock.closeChat);
         }
         this.#chatOwner = action.seat === null ? null : rendererId;
+        this.#chatTarget = action.seat && { serverId: action.serverId, seat: action.seat };
       }
       return Effect.gen({ self: this }, function* () {
         const window = yield* this.#ensureMainWindow();
@@ -496,6 +518,7 @@ export class AgentDockWindowController {
     if (this.#drag?.rendererId === entry.rendererId) this.#drag = null;
     if (this.#chatOwner !== entry.rendererId) return;
     this.#chatOwner = null;
+    this.#chatTarget = null;
     const main = this.#options.getMainWindow();
     const serverId = this.#presentation?.serverId;
     if (main && !main.isDestroyed() && serverId !== undefined) {

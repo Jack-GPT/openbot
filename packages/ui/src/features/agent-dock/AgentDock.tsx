@@ -21,6 +21,7 @@ import {
   Search,
   Settings,
 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -208,6 +209,9 @@ export interface AgentDockProps {
   onOpenInMain: (seat: AgentDockSeatRef) => void;
   /** Opens an agent in its own chat window. The agent menus show the item only when it is set. */
   onOpenWindow?: ((agentId: string) => void) | undefined;
+  renderVoiceConversation?: ((agent: ComposerAgent, end: () => void) => JSX.Element) | undefined;
+  onVoiceChange?: ((active: boolean) => void) | undefined;
+  voiceRequest?: number | undefined;
   /** All agents of the server, so that mentions in a chat show as chips. */
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
@@ -290,6 +294,8 @@ export function AgentDock(props: AgentDockProps) {
     sending: {},
     focus: 0,
   });
+  const [voiceSeat, setVoiceSeat] = createSignal<string | null>(null);
+  let lastAgentSeat: string | null = null;
   /* The last props of each seat, so a seat that leaves keeps its face while it shrinks away. */
   const seatProps = createMemo((previous?: Map<string, AgentDockSeat>) => {
     const next = new Map(previous);
@@ -698,6 +704,8 @@ export function AgentDock(props: AgentDockProps) {
   function openChat(id: string) {
     const index = state.seats.indexOf(id);
     if (index < 0) return;
+    if (voiceSeat() !== id) endVoiceConversation();
+    if (refOfKey(id).kind === "agent") lastAgentSeat = id;
     finishRecording(id);
     // A seat at a faded edge scrolls into the view; the panel grows from where the seat stops.
     const scroll = revealScroll(index);
@@ -721,6 +729,42 @@ export function AgentDock(props: AgentDockProps) {
     }
     motion.kick();
   }
+
+  function startVoiceConversation(id: string) {
+    if (!props.renderVoiceConversation || (props.voice?.phase ?? "idle") !== "idle") return;
+    if (voiceSeat() === id) return;
+    setVoiceSeat(id);
+    props.onVoiceChange?.(true);
+  }
+
+  function endVoiceConversation() {
+    setVoiceSeat(null);
+    props.onVoiceChange?.(false);
+  }
+
+  function returnToChat() {
+    endVoiceConversation();
+    setState((draft) => {
+      draft.focus += 1;
+    });
+  }
+
+  createEffect(
+    () => props.voiceRequest,
+    (request) => {
+      if (!request) return;
+      untrack(() => {
+        if ((props.voice?.phase ?? "idle") !== "idle") return;
+        const agents = props.seats
+          .filter((seat) => seat.kind === "agent")
+          .map((seat) => agentDockSeatKey(seatRef(seat)));
+        const id = agents.find((key) => key === state.open) ?? agents.find((key) => key === lastAgentSeat) ?? agents[0];
+        if (!id) return;
+        if (state.open !== id) openChat(id);
+        startVoiceConversation(id);
+      });
+    },
+  );
 
   /**
    * A recording ends when its chat closes or another chat opens. Its words go into its draft, so a
@@ -795,6 +839,7 @@ export function AgentDock(props: AgentDockProps) {
   function closeChat(returnFocus = true) {
     const id = state.open;
     if (!id) return;
+    endVoiceConversation();
     finishRecording();
     originY.jump(seatY(id));
     if (panelOpen.value > 0.98) closing.jump(1);
@@ -1087,6 +1132,10 @@ export function AgentDock(props: AgentDockProps) {
   const closeOnEscape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || !state.open || event.defaultPrevented) return;
     event.preventDefault();
+    if (voiceSeat()) {
+      returnToChat();
+      return;
+    }
     closeChat();
   };
 
@@ -1451,35 +1500,54 @@ export function AgentDock(props: AgentDockProps) {
             {(id) => (
               <Show when={seatFor(id)}>
                 {(seat) => (
-                  <AgentDockChat
-                    seat={seat()}
-                    chat={props.chat(refOfKey(id))}
-                    draft={state.drafts[id] ?? ""}
-                    pending={state.pending[id] ?? []}
-                    error={state.errors[id] ?? null}
-                    sending={state.sending[id] ?? false}
-                    focusRequest={state.focus}
-                    onDraftChange={(value) =>
-                      setState((draft) => {
-                        draft.drafts[id] = value;
-                      })
+                  <Show
+                    when={voiceSeat() === id && seat().kind === "agent"}
+                    fallback={
+                      <AgentDockChat
+                        seat={seat()}
+                        chat={props.chat(refOfKey(id))}
+                        draft={state.drafts[id] ?? ""}
+                        pending={state.pending[id] ?? []}
+                        error={state.errors[id] ?? null}
+                        sending={state.sending[id] ?? false}
+                        focusRequest={state.focus}
+                        onDraftChange={(value) =>
+                          setState((draft) => {
+                            draft.drafts[id] = value;
+                          })
+                        }
+                        onSend={() => void send()}
+                        onClose={() => closeChat()}
+                        onRemove={() => props.onRemove(refOfKey(id))}
+                        onOpenInMain={() => {
+                          closeChat(false);
+                          props.onOpenInMain(refOfKey(id));
+                        }}
+                        onOpenWindow={openWindowFor(id)}
+                        onStartVoiceConversation={
+                          seat().kind === "agent" && props.renderVoiceConversation
+                            ? () => startVoiceConversation(id)
+                            : undefined
+                        }
+                        voice={chatVoice(id)}
+                        agents={props.agents}
+                        onSelectAgent={(agentId) => {
+                          closeChat(false);
+                          props.onSelectAgent?.(agentId);
+                        }}
+                        onOpenLink={(url) => props.onOpenLink?.(url)}
+                      />
                     }
-                    onSend={() => void send()}
-                    onClose={() => closeChat()}
-                    onRemove={() => props.onRemove(refOfKey(id))}
-                    onOpenInMain={() => {
-                      closeChat(false);
-                      props.onOpenInMain(refOfKey(id));
-                    }}
-                    onOpenWindow={openWindowFor(id)}
-                    voice={chatVoice(id)}
-                    agents={props.agents}
-                    onSelectAgent={(agentId) => {
-                      closeChat(false);
-                      props.onSelectAgent?.(agentId);
-                    }}
-                    onOpenLink={(url) => props.onOpenLink?.(url)}
-                  />
+                  >
+                    <div class="agent-dock-voice">
+                      {(() => {
+                        const selected = untrack(seat);
+                        return selected.kind === "agent"
+                          ? props.renderVoiceConversation?.(selected.agent, returnToChat)
+                          : undefined;
+                      })()}
+                    </div>
+                  </Show>
                 )}
               </Show>
             )}

@@ -4,12 +4,11 @@ import {
   Bell,
   Bot,
   CircleArrowDown,
-  CreditCard,
+  Command,
   Mic,
   MousePointer2,
   PanelRight,
   PanelTop,
-  Server,
   Settings,
   Smartphone,
   UserRound,
@@ -17,6 +16,7 @@ import {
 
 export type SettingsTab =
   | "general"
+  | "shortcuts"
   | "agents"
   | "notifications"
   | "voice"
@@ -24,10 +24,8 @@ export type SettingsTab =
   | "agent-dock"
   | "computer-use"
   | "profile"
-  | "billing"
   | "mobile-connect"
-  | "updates"
-  | "hosted-servers";
+  | "updates";
 
 /**
  * A row of a tab that the settings search finds. The title key is also the anchor of the row: the
@@ -90,6 +88,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
     ],
+  },
+  {
+    value: "shortcuts",
+    titleKey: "settings.tab.shortcuts.title",
+    descriptionKey: "settings.tab.shortcuts.description",
+    icon: Command,
+    rows: [{ titleKey: "settings.voiceShortcut.title", descriptionKey: "settings.voiceShortcut.description" }],
   },
   {
     value: "agents",
@@ -188,13 +193,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [{ titleKey: "computerUse.permissions.title", descriptionKey: "computerUse.permissions.description" }],
   },
   {
-    value: "billing",
-    titleKey: "settings.tab.billing.title",
-    descriptionKey: "settings.tab.billing.description",
-    icon: CreditCard,
-    rows: [],
-  },
-  {
     value: "mobile-connect",
     titleKey: "settings.tab.mobileConnect.title",
     descriptionKey: "settings.tab.mobileConnect.description",
@@ -226,13 +224,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.updates.managed.title", descriptionKey: "settings.updates.managed.description" },
     ],
   },
-  {
-    value: "hosted-servers",
-    titleKey: "settings.tab.hostedServers.title",
-    descriptionKey: "settings.tab.hostedServers.description",
-    icon: Server,
-    rows: [],
-  },
 ];
 
 export function navItem(tab: SettingsTab): SettingsNavItem {
@@ -242,14 +233,12 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
 }
 
 /**
- * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel. The Dynamic Island and the agent dock are macOS, Windows and Linux features of the main window.
+ * Whether the settings panel and its search show the tab. The Dynamic Island and the agent dock belong to the main window.
  */
 export function settingsTabShown(
   tab: SettingsTab,
   window: { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
 ): boolean {
-  if (tab === "hosted-servers") return false;
   if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
   if (tab === "agent-dock") return window.platform !== undefined && !window.chatWindow;
   return true;

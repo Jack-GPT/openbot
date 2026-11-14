@@ -500,6 +500,9 @@
   "error.voice.server.keyRefused": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.voice.server.routeOff": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.voice.server.tooLarge": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.voice.shortcut.invalid": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
+  "error.voice.shortcut.saveFailed": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
+  "error.voice.shortcut.unavailable": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
   "error.voice.speech.providerFailed": [
     "ar",
     "de",
@@ -3222,6 +3225,9 @@
     "tr",
     "zh"
   ],
+  "settings.voiceShortcut.description": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
+  "settings.voiceShortcut.record": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
+  "settings.voiceShortcut.title": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr"],
   "sitePage.contact.channel.discord": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.contact.channel.github": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.contact.channel.x": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],

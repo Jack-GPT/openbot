@@ -5,13 +5,15 @@
 // key reaches a new process and the same thread there, although `auth.json` still holds the old
 // key; that with no stored key the config names no key, so the user's own sign-in stays in use;
 // that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; and that a model
-// whose provider has no sign-in names that provider and its fix (#2746).
+// whose provider has no sign-in names that provider and its fix (#2746). The real model catalog
+// also keeps the Console models the CLI reports alongside Go models with a saved key.
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
+import { ModelCatalog } from "../src/backend/agent/model-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -37,6 +39,7 @@ interface Report {
   noStoredKey?: { configKey: string | null; key: string | null };
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
+  catalogIncludesConsole?: boolean;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -62,10 +65,15 @@ function open(cli: AgentCliInfo): AgentClient {
 }
 
 try {
-  const executable = join(root, "opencode", "bin", "opencode");
+  const executable = join(root, process.platform === "win32" ? "opencode.cmd" : "opencode");
   const workspace = join(root, "workspace");
   await mkdir(workspace);
-  await installFakeAgent(executable, "opencode-expired-key");
+  if (process.platform === "win32") {
+    const fake = join(import.meta.dirname, "provider-fakes", "agents", "opencode-expired-key.ts");
+    await writeFile(executable, `@echo off\r\n"${process.execPath}" "${fake}" %*\r\n`);
+  } else {
+    await installFakeAgent(executable, "opencode-expired-key");
+  }
   const cli: AgentCliInfo = { executable, version: "1.18.30", source: "managed" };
 
   // 1. An expired key reads as the expired-key error, with no "Internal error" in front of it.
@@ -88,6 +96,25 @@ try {
   const loaded = entries.some((entry) => entry.event === "load" && entry.sessionId === thread);
   assert.ok(loaded, "The new process loads the same thread.");
   report.replaced = { thread, loaded, key: prompt?.key ?? null };
+
+  const catalog = new ModelCatalog({
+    client: (provider) => (provider === "opencode" ? second : undefined),
+    isSignedOut: () => false,
+    requestTimeoutMs: 10_000,
+    recordProviderError: (_, error) => assert.fail(String(error)),
+  });
+  const { fresh } = await runCauseEffect(catalog.refresh());
+  assert.ok(fresh.has("opencode"), "The catalog loads the current OpenCode models.");
+  const models = catalog.list().filter((model) => model.provider === "opencode");
+  assert.ok(
+    models.some(({ id }) => id === "opencode-go/glm-5.3"),
+    "Go models stay in the catalog.",
+  );
+  assert.ok(
+    models.some(({ id }) => id === "opencode/claude-opus-5-5"),
+    "The catalog keeps the Console model.",
+  );
+  report.catalogIncludesConsole = true;
   await runCauseEffect(second.stop());
 
   // 3. With no stored key the config names no key, so the user's own `auth.json` key stays in use.

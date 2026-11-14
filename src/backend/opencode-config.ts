@@ -86,7 +86,7 @@ interface OpenCodeProviderEntry {
 }
 
 /**
- * The stored OpenCode Go key, under a built-in provider that `OPENCODE_API_KEY` also reaches.
+ * The stored OpenCode key, under a built-in provider that `OPENCODE_API_KEY` also reaches.
  *
  * OpenCode applies the key from its own `auth.json` (`opencode auth login`) after the environment
  * key, so an old key saved there replaced the key pasted into OpenBot, and a new key could not fix
@@ -144,7 +144,7 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-/** The built-in providers that read `OPENCODE_API_KEY`: OpenCode Go and the free tier. */
+/** The built-in providers that read `OPENCODE_API_KEY`: Go and Console. */
 const OPENCODE_KEY_PROVIDERS = ["opencode-go", "opencode"] as const;
 
 /** What a plain OpenCode user needs, now that the free models run without an account at all. */

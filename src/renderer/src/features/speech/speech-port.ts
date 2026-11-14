@@ -22,6 +22,9 @@ export interface SpeechPort {
     | "mossAudio"
     | "mossControl"
     | "onMossEvent"
+    | "getShortcut"
+    | "setShortcut"
+    | "onShortcut"
   >;
   agent: Pick<OpenBotDesktopApi["agent"], "readConversationPage" | "discardDraftAttachment">;
 }

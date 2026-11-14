@@ -104,6 +104,7 @@ import {
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isVoiceShortcut,
   isWindowTransparency,
   isXaiSpeechVoice,
   type LinkAccountStatus,
@@ -628,9 +629,18 @@ export function decodeSpeechSettings(value: unknown): SpeechSettings {
   };
 }
 
+export function decodeVoiceShortcut(value: unknown): string | null {
+  if (value === null || isVoiceShortcut(value)) return value;
+  throw new Error("Invalid voice shortcut.");
+}
+
 export function decodeMossLiveEvent(value: unknown): MossLiveEvent {
   const e = decodeRecord(value, "MOSS live event");
   switch (e.type) {
+    case "reconnecting":
+      return { type: e.type };
+    case "reconnected":
+      return { type: e.type, resumed: requiredBoolean(e, "resumed") };
     case "ended":
       return { type: e.type, error: requiredString(e, "error") };
     case "transcript":

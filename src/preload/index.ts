@@ -220,6 +220,7 @@ import {
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
   decodeVoiceSettings,
+  decodeVoiceShortcut,
   decodeVoiceStream,
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
@@ -965,6 +966,9 @@ const openbotApi: OpenBotDesktopApi = {
     mossAudio: decodeVoid,
     mossControl: decodeVoid,
     mossEvent: decodeMossLiveEvent,
+    getShortcut: decodeVoiceShortcut,
+    setShortcut: decodeVoiceShortcut,
+    shortcut: decodeVoid,
     liveEvent: decodeVoiceLiveEvent,
   }),
   auth: bridgeGroup(IPC_ENDPOINTS.auth, {

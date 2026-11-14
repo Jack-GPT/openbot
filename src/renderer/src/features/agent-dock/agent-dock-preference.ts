@@ -32,8 +32,7 @@ export interface AgentDockPreference {
 }
 
 const DEFAULT_PREFERENCE: AgentDockPreference = {
-  // Development builds start with the dock hidden; the user can show it in Settings.
-  shown: !import.meta.env.DEV,
+  shown: true,
   placement: "screen",
   display: { kind: "window" },
   edge: "right",

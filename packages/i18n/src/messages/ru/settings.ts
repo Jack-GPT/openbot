@@ -90,7 +90,7 @@ export const messages = {
   "settings.quitGuard.always": "Всегда",
   "settings.quitGuard.never": "Никогда",
   "settings.externalLinks.title": "Открывать внешние ссылки в",
-  "settings.externalLinks.description": "Здесь открываются ссылки из чатов, страниц входа и оплаты.",
+  "settings.externalLinks.description": "Здесь открываются ссылки из чатов и со страниц входа.",
   "settings.externalLinks.defaultBrowser": "Основной браузер",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Основной браузер ({name})",
@@ -114,6 +114,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Компактные действия с сообщениями",
   "settings.compactMessageActions.description":
     "Показывает «Реакция», «Ответить» и «Ещё» рядом с сообщением, а время — между сообщениями. Если выключено, все действия и время показываются под каждым сообщением.",
+  "settings.voiceShortcut.off": "Выключено",
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. У агентов, которые этого не поддерживают, они ждут в очереди.",
@@ -290,6 +291,12 @@ export const messages = {
     "Вкл.: метаданные об использовании и надёжности отправляются в собственную аналитику OpenBot вместе с ID аккаунта и почтой. Выкл.: те же метаданные отправляются только со случайным ID установки. Чаты, файлы и промпты никогда не отправляются. Настройка действует для этого браузера.",
   "settings.tab.general.title": "Основные",
   "settings.tab.general.description": "Как OpenBot ведёт себя на этом компьютере.",
+  "settings.shortcuts.reset": "Восстановить по умолчанию",
+  "settings.shortcuts.conflict": "Это сочетание клавиш уже используется.",
+  "settings.shortcuts.invalid":
+    "Используйте букву, цифру, стрелку или функциональную клавишу вместе с Ctrl, Alt или системной клавишей.",
+  "settings.tab.shortcuts.title": "Сочетания клавиш",
+  "settings.tab.shortcuts.description": "Настройте сочетания клавиш в OpenBot.",
   "settings.tab.agents.title": "Агенты",
   "settings.tab.agents.description":
     "Выберите, что могут делать агенты на этом компьютере, если вы не задали это для агента.",
@@ -311,10 +318,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Выберите, где показывается док и какие агенты в нём.",
   "settings.tab.updates.title": "Обновления",
   "settings.tab.updates.description": "Поддерживайте OpenBot на этом компьютере в актуальном состоянии.",
-  "settings.tab.billing.title": "Оплата",
-  "settings.tab.billing.description": "Лицензия, тарифы серверов, способ оплаты и счета.",
-  "settings.tab.hostedServers.title": "Облачные серверы",
-  "settings.tab.hostedServers.description": "Серверы OpenBot, которые работают, даже когда этот компьютер выключен.",
   "settings.sections.label": "Разделы настроек",
   "settings.panel.resize": "Изменить размер правой панели",
   "settings.preferences.loadFailed": "Не удалось загрузить настройки.",

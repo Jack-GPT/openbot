@@ -7,6 +7,7 @@
 import {
   AppWindow,
   ArrowUp,
+  AudioLines,
   Bubble,
   BubbleContent,
   Button,
@@ -120,6 +121,7 @@ export function AgentDockChat(props: {
   onOpenInMain: () => void;
   /** The ⋯ menu shows "Open in new window" only when it is set. */
   onOpenWindow?: (() => void) | undefined;
+  onStartVoiceConversation?: (() => void) | undefined;
   /** The composer shows a microphone only when it is set. */
   voice?: AgentDockChatVoice | undefined;
   /** The agents that mentions in the messages and the composer name. */
@@ -276,6 +278,17 @@ export function AgentDockChat(props: {
           <strong>{name()}</strong>
           <span>{subtitle()}</span>
         </div>
+        <Show when={props.onStartVoiceConversation}>
+          <IconButton
+            label={t("conversation.voice.start")}
+            variant="ghost"
+            class="agent-dock-icon"
+            disabled={voicePhase() !== "idle" || props.voice?.blocked}
+            onClick={() => props.onStartVoiceConversation?.()}
+          >
+            <AudioLines aria-hidden="true" />
+          </IconButton>
+        </Show>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger class="agent-dock-icon" aria-label={t("agent.dock.more")}>
             <Ellipsis aria-hidden="true" />

@@ -597,7 +597,21 @@ export type MossLiveControl =
   | { action: "played" | "stopped" | "completed"; runId: string; turnId: string; chunkId?: string; playedMs?: number }
   | { action: "answer"; callId: string; text: string };
 
+export const DEFAULT_VOICE_SHORTCUT = "Alt+V";
+
+/** Canonical Electron accelerator from the desktop shortcut recorder. */
+export function isVoiceShortcut(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^(?=(?:Control|Alt|Super)\+|Shift\+(?:Control|Alt|Super)\+)(?:Control\+)?(?:Alt\+)?(?:Shift\+)?(?:Super\+)?(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|Space)$/u.test(
+      value,
+    )
+  );
+}
+
 export type MossLiveEvent =
+  | { type: "reconnecting" }
+  | { type: "reconnected"; resumed: boolean }
   | { type: "transcript"; role: "user" | "assistant"; text: string }
   | { type: "audio"; pcm: Uint8Array; runId: string; turnId: string; chunkId: string }
   | { type: "stop" | "done"; runId: string; turnId: string }

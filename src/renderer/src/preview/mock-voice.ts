@@ -2,6 +2,7 @@ import {
   cloudSpeechModel,
   DEFAULT_SPEECH_SETTINGS,
   DEFAULT_VOICE_SETTINGS,
+  DEFAULT_VOICE_SHORTCUT,
   type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
   isLocalVoiceModelId,
@@ -99,6 +100,7 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const liveAnswerers = new Map<string, RTCPeerConnection>();
   let xaiKeySaved = options.xaiKeySaved ?? false;
   let mossKeySaved = false;
+  let shortcut: string | null = DEFAULT_VOICE_SHORTCUT;
   const keySaved = (provider: SpeechKeyProvider) =>
     provider === "xai" ? xaiKeySaved : ready.has(ELEVENLABS_VOICE_MODEL_ID);
   const speechStatus = (): SpeechModelStatus => {
@@ -251,6 +253,12 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     mossAudio: async () => undefined,
     mossControl: async () => undefined,
     onMossEvent: () => () => undefined,
+    getShortcut: async () => shortcut,
+    setShortcut: async (value) => {
+      shortcut = value;
+      return shortcut;
+    },
+    onShortcut: () => () => undefined,
     setSpeechSettings: async (next) => {
       const changed = next.modelId !== speechSettings.modelId;
       if (changed) stopSpeechTransfer();

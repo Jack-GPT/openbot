@@ -3,8 +3,3 @@ publish:
   provider: github
   owner: Jack-GPT
   repo: openbot
-win:
-  icon: build/icon-dev.ico
-nsis:
-  installerIcon: build/icon-dev.ico
-  uninstallerIcon: build/icon-dev.ico

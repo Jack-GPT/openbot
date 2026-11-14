@@ -1,6 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Mic, MicOff, X } from "@openbot/ui";
-import type { AgentProfile } from "@openbot/ui/data";
+import type { ComposerAgent } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { VoiceWaveform } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
@@ -27,7 +27,7 @@ const PHASE_MOODS = {
 } as const;
 
 export interface VoicePanelProps {
-  agent: AgentProfile;
+  agent: ComposerAgent;
   phase: VoicePanelPhase;
   /** The microphone is off until the user unmutes it. */
   muted: boolean;
@@ -35,6 +35,7 @@ export interface VoicePanelProps {
   heard: string;
   /** The part of the reply that plays now. */
   said: string;
+  showCaptions?: boolean;
   /** The latest loudness readings of the voice that is heard now, from 0 to 1, oldest first. */
   levels: readonly number[];
   /** Why the conversation stopped listening. */
@@ -88,29 +89,31 @@ export function VoicePanel(props: VoicePanelProps) {
         >
           <VoiceWaveform levels={props.levels} />
         </div>
-        <div class="voice-panel-captions">
-          <Show
-            when={props.error}
-            fallback={
-              <Show
-                when={props.phase === "speaking"}
-                fallback={
-                  <p class="voice-panel-caption" data-empty={props.heard ? undefined : ""}>
-                    {props.heard || (hearing() ? t("conversation.voice.speakNow") : "")}
-                  </p>
-                }
-              >
-                <p class="voice-panel-caption">{props.said}</p>
-              </Show>
-            }
-          >
-            {(error) => (
-              <p class="voice-panel-caption voice-panel-error" role="alert">
-                {error()}
-              </p>
-            )}
-          </Show>
-        </div>
+        <Show when={props.showCaptions !== false || props.error}>
+          <div class="voice-panel-captions">
+            <Show
+              when={props.error}
+              fallback={
+                <Show
+                  when={props.phase === "speaking"}
+                  fallback={
+                    <p class="voice-panel-caption" data-empty={props.heard ? undefined : ""}>
+                      {props.heard || (hearing() ? t("conversation.voice.speakNow") : "")}
+                    </p>
+                  }
+                >
+                  <p class="voice-panel-caption">{props.said}</p>
+                </Show>
+              }
+            >
+              {(error) => (
+                <p class="voice-panel-caption voice-panel-error" role="alert">
+                  {error()}
+                </p>
+              )}
+            </Show>
+          </div>
+        </Show>
       </div>
       <div class="voice-panel-controls">
         <Show when={props.onCycleSpeed}>

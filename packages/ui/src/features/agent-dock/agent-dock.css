@@ -353,6 +353,19 @@
   animation: agent-dock-swap var(--openbot-duration-island-content) var(--openbot-ease-out);
 }
 
+.agent-dock-voice,
+.agent-dock-voice > .voice-panel {
+  height: 100%;
+}
+
+.agent-dock-voice > .voice-panel {
+  position: static;
+  width: 100%;
+  padding: var(--openbot-space-5);
+  border: 0;
+  background: transparent;
+}
+
 @keyframes agent-dock-swap {
   from {
     opacity: 0;

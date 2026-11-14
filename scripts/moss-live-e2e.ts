@@ -26,7 +26,11 @@ const timer = deadline(10_000, undefined, { signal: expected.signal }).then(() =
   throw new Error("MOSS protocol smoke test timed out.");
 });
 const run = { run_id: "run-1", turn_id: "turn-1" };
+const attachIds: Array<string | null> = [];
+const recovery = new EventTarget();
+let connectionNumber = 0;
 server.on("connection", (socket, request) => {
+  const connection = ++connectionNumber;
   assert.equal(request.headers.authorization, "Bearer smoke-key");
   let voiceChanged = false;
   const send = (value: { action: string; data: DynamicRecord }) => socket.send(JSON.stringify(value));
@@ -34,6 +38,7 @@ server.on("connection", (socket, request) => {
     if (binary) {
       assert.equal(raw.toString("hex"), "01000200");
       send({ action: "input.transcript.done", data: { text: "你好" } });
+      if (connection !== 1) return;
       send({
         action: "response.function_call_arguments.done",
         data: {
@@ -48,9 +53,20 @@ server.on("connection", (socket, request) => {
     assert.ok(isDynamicRecord(message) && typeof message.action === "string");
     controls.push(message.action);
     switch (message.action) {
-      case "attach_session":
-        send({ action: "session_attached", data: { session_id: "moss-smoke" } });
+      case "attach_session": {
+        const id = message.session_id;
+        assert.ok(id === null || typeof id === "string");
+        attachIds.push(id);
+        if (connection === 3) {
+          send({ action: "error", data: { error: { code: "session_option_mismatch" } } });
+          break;
+        }
+        send({
+          action: "session_attached",
+          data: { session_id: connection === 1 ? "moss-smoke" : (id ?? "new-smoke") },
+        });
         break;
+      }
       case "change_voice":
         assert.ok(voice);
         assert.equal(message.voice_name, voiceId);
@@ -60,7 +76,15 @@ server.on("connection", (socket, request) => {
       case "session.update":
         assert.equal(voiceChanged, voice !== null);
         assert.ok(isDynamicRecord(message.session) && Array.isArray(message.session.tools));
+        assert.match(String(message.session.instructions), /general questions directly/u);
+        assert.match(String(message.session.instructions), /without announcing the handoff/u);
         send({ action: "session.updated", data: { error: "" } });
+        break;
+      case "mic_state":
+        if (connection > 1) {
+          assert.equal(message.enabled, true);
+          recovery.dispatchEvent(new Event(`mic-${connection}`));
+        }
         break;
       case "conversation.item.create":
         assert.ok(isDynamicRecord(message.item));
@@ -88,6 +112,7 @@ const session = new MossLiveSession(
   voice,
   (event) => {
     events.push(event);
+    recovery.dispatchEvent(new Event(event.type));
     if (event.type === "request")
       session.control({ action: "answer", callId: event.callId, text: "你好，我是 OpenBot。" });
     if (event.type === "audio") {
@@ -117,10 +142,46 @@ try {
     "playback.chunk.completed",
     "playback.completed",
   ]);
+
+  const first = [...server.clients][0];
+  assert.ok(first);
+  const afterRequestError = once(recovery, "transcript");
+  first.send(JSON.stringify({ action: "error", data: { error: { code: "invalid_public_request" } } }));
+  first.send(JSON.stringify({ action: "input.transcript.done", data: { text: "still connected" } }));
+  await Promise.race([afterRequestError, timer]);
+  assert.equal(
+    events.some((event) => event.type === "ended"),
+    false,
+  );
+
+  const restored = Promise.all([once(recovery, "reconnected"), once(recovery, "mic-2")]);
+  first.terminate();
+  await Promise.race([restored, timer]);
+  assert.deepEqual(events.at(-1), { type: "reconnected", resumed: true });
+  const afterReconnect = once(recovery, "transcript");
+  session.audio(new Uint8Array([1, 0, 2, 0]));
+  await Promise.race([afterReconnect, timer]);
+
+  const second = [...server.clients][0];
+  assert.ok(second);
+  const replaced = Promise.all([once(recovery, "reconnected"), once(recovery, "mic-4")]);
+  second.terminate();
+  await Promise.race([replaced, timer]);
+  assert.deepEqual(events.at(-1), { type: "reconnected", resumed: false });
+  assert.deepEqual(attachIds, [null, "moss-smoke", "moss-smoke", null]);
+
+  const fourth = [...server.clients][0];
+  assert.ok(fourth);
+  const reconnecting = once(recovery, "reconnecting");
+  fourth.terminate();
+  await Promise.race([reconnecting, timer]);
+  session.close();
+  assert.equal(connectionNumber, 4);
+  assert.ok(events.every((event) => event.type !== "ended"));
   mkdirSync(".openbot-build/moss-live", { recursive: true });
   writeFileSync(
     `.openbot-build/moss-live/protocol${voice ? `-${voice}` : ""}-report.json`,
-    JSON.stringify({ voice, controls, events: events.map((event) => event.type) }, null, 2),
+    JSON.stringify({ voice, controls, attachIds, events: events.map((event) => event.type), passed: true }, null, 2),
   );
 } finally {
   expected.abort();

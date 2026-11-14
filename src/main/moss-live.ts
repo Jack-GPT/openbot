@@ -1,7 +1,7 @@
 import type { MossLiveControl, MossLiveEvent, MossLiveVoice } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Effect } from "effect";
 import WebSocket, { type RawData } from "ws";
 import { rawDataBytes, rawDataText } from "./ws-raw-data";
@@ -9,26 +9,72 @@ import { rawDataBytes, rawDataText } from "./ws-raw-data";
 const URL = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 const TOOL = "ask_agent";
 const OPEN_TIMEOUT_MS = 15_000;
+const KEEPALIVE_MS = 15_000;
+const MAX_RETRY_DELAY_MS = 15_000;
 const MAX_BUFFERED_AUDIO_BYTES = 64_000;
+const MAX_PENDING_PLAYBACK_RECEIPTS = 512;
+const logger = createOpenBotLogger("moss-live");
+const REQUEST_ERRORS = new Set([
+  "content_too_long",
+  "delegation_terminal",
+  "event_id_conflict",
+  "instructions_full",
+  "invalid_content",
+  "invalid_event_id",
+  "invalid_public_request",
+  "invalid_session_option",
+  "invalid_status",
+  "presentation_capacity",
+  "session_option_mismatch",
+  "tool_task_conflict",
+  "unknown_call_id",
+  "unknown_tool_task",
+  "unsupported_control",
+]);
 // The MOSS Live API reference lists these IDs for change_voice.
 const VOICE_IDS: Record<MossLiveVoice, string> = {
   nuannuan: "6c3152b1-1d4f-4e49-ade3-09f447712fec",
   mumu: "6cc93520-3207-4f7a-bca9-2d560b9c306b",
 };
 type AudioChunk = Pick<Extract<MossLiveEvent, { type: "audio" }>, "runId" | "turnId" | "chunkId">;
+type PlaybackReceipt = Extract<MossLiveControl, { runId: string }>;
+export type MossStopReason =
+  | "stopped"
+  | "replaced"
+  | "disabled"
+  | "key-removed"
+  | "window-closed"
+  | "renderer-exited"
+  | "navigation";
 
 /** One microphone session. The key and provider errors stay in main. */
 export class MossLiveSession {
-  readonly #socket: WebSocket;
   readonly #emit: (event: MossLiveEvent) => void;
   readonly #voiceId: string | null;
+  readonly #open: () => WebSocket;
   readonly #calls = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #answers = new Set<string>();
+  readonly #pendingAnswers = new Map<string, string>();
   readonly #seenCalls = new Set<string>();
+  readonly #playbackReceipts: PlaybackReceipt[] = [];
+  #socket: WebSocket | undefined;
   #chunk: AudioChunk | undefined;
   #settle: ((error: Error | null) => void) | undefined;
-  #phase: "attaching" | "setting-voice" | "configuring" | "ready" = "attaching";
+  #phase: "waiting" | "attaching" | "setting-voice" | "configuring" | "ready" = "waiting";
+  #sessionId: string | null = null;
+  #resumeId: string | null = null;
+  #resumed = false;
+  #connected = false;
   #closed = false;
+  #micEnabled: boolean | undefined;
+  #connectTimer: ReturnType<typeof setTimeout> | undefined;
+  #retryTimer: ReturnType<typeof setTimeout> | undefined;
+  #heartbeat: ReturnType<typeof setInterval> | undefined;
+  #pingTimestamp: number | undefined;
+  #retryDelayMs = 1_000;
+  #connectedAt = 0;
+  #lastInputAt = 0;
+  #lastOutputAt = 0;
 
   constructor(
     key: string,
@@ -38,68 +84,146 @@ export class MossLiveSession {
   ) {
     this.#emit = emit;
     this.#voiceId = voice === null ? null : VOICE_IDS[voice];
-    this.#socket = open(key);
-    this.#socket.on("open", () => this.#send({ action: "attach_session", session_id: null }));
-    this.#socket.on("message", (data, binary) => this.#receive(data, binary));
-    this.#socket.on("unexpected-response", (request, response) => {
-      this.#fail(response.statusCode === 401 || response.statusCode === 403);
-      request.destroy();
-    });
-    this.#socket.on("error", () => this.#fail());
-    this.#socket.on("close", () => this.#fail());
+    this.#open = () => open(key);
   }
 
   readonly ready = Effect.callback<void, Error>((resume) => {
+    if (this.#closed) {
+      resume(Effect.fail(new Error(sourceText("error.voice.moss.failed"))));
+      return;
+    }
     this.#settle = (error) => resume(error ? Effect.fail(error) : Effect.void);
-  }).pipe(
-    Effect.timeoutOrElse({
-      duration: OPEN_TIMEOUT_MS,
-      orElse: () => Effect.fail(new Error(sourceText("error.voice.moss.failed"))),
-    }),
-  );
+    this.#connect();
+    return Effect.sync(() => {
+      if (!this.#connected) this.close();
+    });
+  });
+
+  #connect(): void {
+    if (this.#closed) return;
+    this.#phase = "attaching";
+    this.#resumeId = this.#sessionId;
+    this.#resumed = false;
+    logger.info("Connecting MOSS Live.", { resume: this.#resumeId !== null });
+    let socket: WebSocket;
+    try {
+      socket = this.#open();
+    } catch {
+      this.#disconnect("open-failed");
+      return;
+    }
+    this.#socket = socket;
+    this.#connectTimer = setTimeout(() => {
+      if (socket.readyState === WebSocket.OPEN && this.#phase === "attaching") this.#sessionId = null;
+      this.#disconnect("setup-timeout");
+    }, OPEN_TIMEOUT_MS);
+    socket.on("open", () => {
+      if (this.#socket === socket) this.#send({ action: "attach_session", session_id: this.#resumeId });
+    });
+    socket.on("message", (data, binary) => {
+      if (this.#socket === socket) this.#receive(data, binary);
+    });
+    socket.on("unexpected-response", (request, response) => {
+      if (this.#socket === socket) {
+        const status = response.statusCode;
+        this.#disconnect("http-response", status, status === 401 || status === 403);
+      }
+      request.destroy();
+    });
+    socket.on("error", (error) => {
+      if (this.#socket === socket) this.#disconnect("socket-error", socketErrorCode(error));
+    });
+    socket.on("close", (code) => {
+      if (this.#socket !== socket) return;
+      if (this.#phase === "attaching" && code === 1008) this.#sessionId = null;
+      this.#disconnect("socket-close", code);
+    });
+  }
 
   audio(pcm: Uint8Array): void {
     if (
       this.#phase === "ready" &&
-      this.#socket.readyState === WebSocket.OPEN &&
+      this.#socket?.readyState === WebSocket.OPEN &&
+      this.#micEnabled !== false &&
       this.#socket.bufferedAmount < MAX_BUFFERED_AUDIO_BYTES
-    )
+    ) {
+      this.#lastInputAt = Date.now();
       this.#socket.send(pcm);
+    }
   }
 
   control(input: MossLiveControl): void {
-    if (this.#phase !== "ready") return;
+    if (this.#closed) return;
     if (input.action === "mic") {
-      this.#send({ action: "mic_state", enabled: input.enabled });
+      this.#micEnabled = input.enabled;
+      if (this.#phase === "ready") this.#send({ action: "mic_state", enabled: input.enabled });
       return;
     }
     if (input.action === "answer") {
       if (!this.#finishCall(input.callId)) return;
-      this.#answers.add(input.callId);
-      this.#send({
-        action: "conversation.item.create",
-        item: { type: "function_call_output", call_id: input.callId, output: redactText(input.text) },
-      });
+      const text = redactText(input.text);
+      if (this.#phase === "ready") this.#sendAnswer(input.callId, text);
+      else this.#pendingAnswers.set(input.callId, text);
       return;
     }
+    if (this.#phase === "ready") this.#sendReceipt(input);
+    else if (this.#playbackReceipts.length < MAX_PENDING_PLAYBACK_RECEIPTS) this.#playbackReceipts.push(input);
+  }
+
+  #sendAnswer(callId: string, text: string): void {
+    this.#answers.add(callId);
+    this.#send({
+      action: "conversation.item.create",
+      item: { type: "function_call_output", call_id: callId, output: text },
+    });
+  }
+
+  #sendReceipt(input: PlaybackReceipt): void {
     const ids = { run_id: input.runId, turn_id: input.turnId };
     if (input.action === "played") this.#send({ action: "playback.chunk.completed", ...ids, chunk_id: input.chunkId });
     if (input.action === "completed") this.#send({ action: "playback.completed", ...ids });
     if (input.action === "stopped") this.#send({ action: "playback.stopped", ...ids, played_audio_ms: input.playedMs });
   }
 
-  close(): void {
+  close(reason: MossStopReason = "stopped"): void {
     if (this.#closed) return;
+    logger.info("MOSS Live ended locally.", { reason, ...this.#activity() });
+    this.#close(new Error(sourceText("error.voice.moss.failed")));
+  }
+
+  #close(error: Error): void {
     this.#closed = true;
-    for (const timer of this.#calls.values()) clearTimeout(timer);
-    this.#calls.clear();
-    this.#settle?.(new Error(sourceText("error.voice.moss.failed")));
+    clearTimeout(this.#retryTimer);
+    this.#clearSession(false);
+    this.#settle?.(error);
     this.#settle = undefined;
-    this.#socket.terminate();
+    this.#detachSocket()?.terminate();
+  }
+
+  #clearSession(notify: boolean): void {
+    for (const [callId, timer] of this.#calls) {
+      clearTimeout(timer);
+      if (notify) this.#emit({ type: "cancel", callId });
+    }
+    this.#calls.clear();
+    this.#answers.clear();
+    this.#pendingAnswers.clear();
+    this.#seenCalls.clear();
+    this.#playbackReceipts.length = 0;
+  }
+
+  #detachSocket(): WebSocket | undefined {
+    const socket = this.#socket;
+    this.#socket = undefined;
+    this.#chunk = undefined;
+    clearTimeout(this.#connectTimer);
+    clearInterval(this.#heartbeat);
+    this.#pingTimestamp = undefined;
+    return socket;
   }
 
   #send(event: { action: string } & DynamicRecord): void {
-    if (this.#socket.readyState === WebSocket.OPEN) this.#socket.send(JSON.stringify(event));
+    if (this.#socket?.readyState === WebSocket.OPEN) this.#socket.send(JSON.stringify(event));
   }
 
   #configure(): void {
@@ -108,12 +232,13 @@ export class MossLiveSession {
       action: "session.update",
       session: {
         instructions:
-          "Speak in the user's language. Whenever the user asks you to contact, ask, or give a task to the OpenBot agent, call ask_agent with the user's request, even if you could answer it yourself. Read back its result. Never claim the agent completed a task before receiving the result.",
+          "Speak naturally in the user's language. Answer casual conversation and general questions directly. Use ask_agent only when the user explicitly asks you to involve the selected agent or requests work that needs the agent, such as reading project files or taking action in the workspace. Call the tool without announcing the handoff, OpenBot, or the tool name. If the task takes time and a reply is needed, briefly say you are checking. When the result arrives, share it naturally. Report success only after the tool confirms it.",
         tools: [
           {
             type: "function",
             name: TOOL,
-            description: "Send the user's request to the OpenBot agent.",
+            description:
+              "Ask the selected workspace agent to perform the requested work or check workspace information.",
             execution_mode: "async_effect",
             read_only: false,
             parameters: { type: "object", properties: { request: { type: "string" } }, required: ["request"] },
@@ -123,16 +248,70 @@ export class MossLiveSession {
     });
   }
 
-  #fail(rejected = false): void {
+  #activity() {
+    const now = Date.now();
+    return {
+      phase: this.#phase,
+      connectedMs: this.#connectedAt ? now - this.#connectedAt : null,
+      lastInputMsAgo: this.#lastInputAt ? now - this.#lastInputAt : null,
+      lastOutputMsAgo: this.#lastOutputAt ? now - this.#lastOutputAt : null,
+    };
+  }
+
+  #disconnect(reason: string, code?: string | number, rejected = false): void {
     if (this.#closed) return;
-    const error = rejected
-      ? sourceText("error.voice.cloud.keyRejected", { provider: "MOSS" })
-      : sourceText("error.voice.moss.failed");
-    const wasReady = this.#phase === "ready";
-    this.#settle?.(new Error(error));
+    const activity = this.#activity();
+    const socket = this.#detachSocket();
+    if (!this.#connected || rejected) {
+      logger.warn("MOSS Live connection ended.", { reason, code, ...activity });
+      const error = rejected
+        ? sourceText("error.voice.cloud.keyRejected", { provider: "MOSS" })
+        : sourceText("error.voice.moss.failed");
+      this.#close(new Error(error));
+      socket?.terminate();
+      if (this.#connected) this.#emit({ type: "ended", error });
+      return;
+    }
+
+    this.#phase = "waiting";
+    const delayMs = this.#retryDelayMs;
+    this.#retryDelayMs = Math.min(delayMs * 2, MAX_RETRY_DELAY_MS);
+    logger.warn("MOSS Live will reconnect.", { reason, code, retryInMs: delayMs, ...activity });
+    if (activity.phase === "ready") this.#emit({ type: "reconnecting" });
+    socket?.terminate();
+    this.#retryTimer = setTimeout(() => this.#connect(), delayMs);
+    this.#retryTimer.unref();
+  }
+
+  #onReady(): void {
+    clearTimeout(this.#connectTimer);
+    this.#phase = "ready";
+    this.#connectedAt = Date.now();
+    this.#lastInputAt = 0;
+    this.#lastOutputAt = 0;
+    this.#retryDelayMs = 1_000;
+    logger.info("MOSS Live connected.", { reconnected: this.#connected, resumed: this.#resumed });
+    if (this.#connected) {
+      if (!this.#resumed) this.#clearSession(true);
+      if (this.#micEnabled !== undefined) this.control({ action: "mic", enabled: this.#micEnabled });
+      for (const receipt of this.#playbackReceipts) this.#sendReceipt(receipt);
+      this.#playbackReceipts.length = 0;
+      for (const [callId, text] of this.#pendingAnswers) this.#sendAnswer(callId, text);
+      this.#pendingAnswers.clear();
+      this.#emit({ type: "reconnected", resumed: this.#resumed });
+    }
+    this.#connected = true;
+    this.#settle?.(null);
     this.#settle = undefined;
-    if (wasReady) this.#emit({ type: "ended", error });
-    this.close();
+    this.#heartbeat = setInterval(() => {
+      if (this.#pingTimestamp !== undefined) {
+        this.#disconnect("keepalive-timeout");
+        return;
+      }
+      this.#pingTimestamp = Date.now();
+      this.#send({ action: "ping", timestamp: this.#pingTimestamp });
+    }, KEEPALIVE_MS);
+    this.#heartbeat.unref();
   }
 
   #receive(raw: RawData, binary: boolean): void {
@@ -141,14 +320,17 @@ export class MossLiveSession {
       const chunk = this.#chunk;
       this.#chunk = undefined;
       const pcm = rawDataBytes(raw);
-      if (chunk && pcm.byteLength % 2 === 0) this.#emit({ type: "audio", ...chunk, pcm });
+      if (chunk && pcm.byteLength % 2 === 0) {
+        this.#lastOutputAt = Date.now();
+        this.#emit({ type: "audio", ...chunk, pcm });
+      }
       return;
     }
     let value: unknown;
     try {
       value = JSON.parse(rawDataText(raw));
     } catch {
-      this.#fail();
+      this.#disconnect("invalid-json");
       return;
     }
     if (!isDynamicRecord(value)) return;
@@ -156,6 +338,8 @@ export class MossLiveSession {
     switch (value.action) {
       case "session_attached":
         if (this.#phase !== "attaching") return;
+        this.#sessionId = typeof data.session_id === "string" && data.session_id ? data.session_id : null;
+        this.#resumed = this.#sessionId !== null && this.#sessionId === this.#resumeId;
         if (this.#voiceId === null) this.#configure();
         else {
           this.#phase = "setting-voice";
@@ -165,21 +349,40 @@ export class MossLiveSession {
       case "voice_changed":
         if (this.#phase !== "setting-voice") return;
         if (data.name === this.#voiceId) this.#configure();
-        else this.#fail();
+        else this.#disconnect("voice-mismatch");
         return;
       case "session.updated":
         if (this.#phase !== "configuring") return;
         if (data.error !== "") {
-          this.#fail();
+          this.#disconnect("configuration-rejected");
           return;
         }
-        this.#phase = "ready";
-        this.#settle?.(null);
-        this.#settle = undefined;
+        this.#onReady();
         return;
-      case "error":
+      case "pong":
+        if (data.client_timestamp === this.#pingTimestamp) this.#pingTimestamp = undefined;
+        return;
+      case "session.closing":
+        if (data.reconnect === false) this.#sessionId = null;
+        logger.info("MOSS Live server is closing the connection.", {
+          code: typeof data.code === "number" ? data.code : undefined,
+          resume: data.reconnect === true,
+        });
+        return;
+      case "error": {
+        const error = isDynamicRecord(data.error) ? data.error : {};
+        const code = typeof error.code === "string" && REQUEST_ERRORS.has(error.code) ? error.code : "other";
+        if (this.#phase === "ready") {
+          logger.warn("MOSS Live reported a request or session error.", { code, ...this.#activity() });
+          return;
+        }
+        if (this.#phase === "attaching") this.#sessionId = null;
+        this.#disconnect("provider-setup-error", code);
+        return;
+      }
       case "session.closed":
-        this.#fail();
+        if (data.reconnect === false) this.#sessionId = null;
+        this.#disconnect("provider-closed");
         return;
       case "input.transcript.updated":
       case "input.transcript.done":
@@ -198,12 +401,16 @@ export class MossLiveSession {
         return;
       case "response.audio.done":
       case "response.audio.stop":
+        if (value.action === "response.audio.stop") logger.info("MOSS Live stopped a reply.", this.#activity());
         if (typeof data.run_id === "string" && typeof data.turn_id === "string")
           this.#emit({
             type: value.action === "response.audio.done" ? "done" : "stop",
             runId: data.run_id,
             turnId: data.turn_id,
           });
+        return;
+      case "response.interrupted":
+        logger.info("MOSS Live interrupted a reply.", this.#activity());
         return;
       case "response.function_call_arguments.done":
         this.#tool(data);
@@ -267,6 +474,23 @@ export class MossLiveSession {
     if (timer === undefined) return false;
     clearTimeout(timer);
     return this.#calls.delete(callId);
+  }
+}
+
+function socketErrorCode(error: Error): string | undefined {
+  if (!("code" in error)) return undefined;
+  switch (error.code) {
+    case "ECONNRESET":
+    case "ECONNREFUSED":
+    case "EHOSTUNREACH":
+    case "ENETUNREACH":
+    case "EPIPE":
+    case "ETIMEDOUT":
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return error.code;
+    default:
+      return "other";
   }
 }
 

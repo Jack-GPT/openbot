@@ -91,7 +91,7 @@ export const messages = {
   "settings.quitGuard.always": "Sempre",
   "settings.quitGuard.never": "Nunca",
   "settings.externalLinks.title": "Abrir links externos em",
-  "settings.externalLinks.description": "Links de chats, páginas de login e páginas de cobrança abrem aqui.",
+  "settings.externalLinks.description": "Links de chats e páginas de login abrem aqui.",
   "settings.externalLinks.defaultBrowser": "Navegador padrão",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navegador padrão ({name})",
@@ -115,6 +115,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Ações de mensagem compactas",
   "settings.compactMessageActions.description":
     "Mostra Reagir, Responder e Mais ao lado de uma mensagem, e a hora entre as mensagens. Desativado, todas as ações e a hora aparecem abaixo de cada mensagem.",
+  "settings.voiceShortcut.off": "Desativado",
   "settings.busyMessage.title": "Orientar agentes enquanto trabalham",
   "settings.busyMessage.description":
     "Novas mensagens entram no trabalho atual do agente, não na fila. Com agentes que não suportam isso, elas esperam na fila.",
@@ -288,6 +289,12 @@ export const messages = {
     "Ativado: os metadados de uso e confiabilidade vão para o serviço de análise hospedado pelo próprio OpenBot com o ID e o e-mail da sua conta. Desativado: os mesmos metadados vão só com um ID de instalação aleatório. Chats, arquivos e prompts nunca são enviados. Esta configuração se aplica a este navegador.",
   "settings.tab.general.title": "Geral",
   "settings.tab.general.description": "Controle como o OpenBot se comporta neste computador.",
+  "settings.shortcuts.reset": "Restaurar padrão",
+  "settings.shortcuts.conflict": "Este atalho já está em uso.",
+  "settings.shortcuts.invalid":
+    "Use uma letra, um número, uma seta ou uma tecla de função com Ctrl, Alt ou a tecla do sistema.",
+  "settings.tab.shortcuts.title": "Atalhos de teclado",
+  "settings.tab.shortcuts.description": "Configure os atalhos de teclado do OpenBot.",
   "settings.tab.agents.title": "Agentes",
   "settings.tab.agents.description":
     "Escolha o que os agentes deste computador podem fazer quando você não define isso para um agente.",
@@ -309,11 +316,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Escolha onde o dock aparece e quais agentes ficam nele.",
   "settings.tab.updates.title": "Atualizações",
   "settings.tab.updates.description": "Mantenha o OpenBot atualizado neste computador.",
-  "settings.tab.billing.title": "Cobrança",
-  "settings.tab.billing.description": "Licença, planos dos servidores, forma de pagamento e faturas.",
-  "settings.tab.hostedServers.title": "Servidores hospedados",
-  "settings.tab.hostedServers.description":
-    "Crie servidores OpenBot que funcionam quando este computador está desligado.",
   "settings.sections.label": "Seções das configurações",
   "settings.panel.resize": "Redimensionar painel direito",
   "settings.preferences.loadFailed": "Não foi possível carregar suas configurações.",

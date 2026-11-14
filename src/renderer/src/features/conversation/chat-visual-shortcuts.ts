@@ -1,5 +1,6 @@
 import type { ChatVisualKey } from "@openbot/contracts/chat-visual";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { appShortcutIds, matchesAppShortcut } from "../settings/app-shortcuts";
 import { isOpenSettingsShortcut } from "../settings/settings-shortcut";
 
 /**
@@ -7,7 +8,12 @@ import { isOpenSettingsShortcut } from "../settings/settings-shortcut";
  * search, Settings, and a server by its number. The app's own handlers then check the key again.
  * Any other chord stays in the page.
  */
-export function isChatVisualAppShortcut(key: ChatVisualKey): boolean {
-  if (isGlobalSearchShortcut(key) || isOpenSettingsShortcut(key)) return true;
+export function isChatVisualAppShortcut(key: ChatVisualKey, web: boolean): boolean {
+  if (
+    web
+      ? isGlobalSearchShortcut(key) || isOpenSettingsShortcut(key)
+      : appShortcutIds.some((id) => matchesAppShortcut(id, key))
+  )
+    return true;
   return (key.metaKey || key.ctrlKey) && !key.altKey && !key.shiftKey && /^[1-9]$/u.test(key.key);
 }

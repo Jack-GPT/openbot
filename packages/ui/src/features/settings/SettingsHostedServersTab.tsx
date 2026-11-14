@@ -188,30 +188,42 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
         </ItemGroup>
       </Show>
 
-      <ConfirmDialog
-        open={
-          state().pendingDelete !== null && !props.excludedServerIds?.includes(state().pendingDelete?.serverId ?? "")
-        }
-        title={t("settings.hostedServers.deleteTitle", { name: state().pendingDelete?.name ?? "" })}
-        description={t("settings.hostedServers.deleteDescription")}
-        confirmLabel={t("common.delete")}
-        pendingLabel={t("settings.hostedServers.deleting")}
-        pending={state().deleting}
-        error={state().deleteError ?? undefined}
-        initialFocus="cancel"
-        onCancel={props.store.cancelDelete}
-        onConfirm={props.store.confirmDelete}
-      >
-        <Field label={t("settings.hostedServers.deleteConfirmLabel", { name: state().pendingDelete?.name ?? "" })}>
-          <Input
-            value={state().deleteConfirmName}
-            autocomplete="off"
-            spellcheck={false}
-            disabled={state().deleting}
-            onValueChange={props.store.setDeleteConfirmName}
-          />
-        </Field>
-      </ConfirmDialog>
+      <HostedServerDeleteDialog store={props.store} excludedServerIds={props.excludedServerIds} />
     </SettingsSection>
+  );
+}
+
+export function HostedServerDeleteDialog(props: {
+  store: SettingsHostedServersStore;
+  excludedServerIds?: readonly string[] | undefined;
+  restoreFocusTarget?: HTMLElement | null | undefined;
+}) {
+  const { t } = useText();
+  const state = () => props.store.state;
+  const name = () => state().pendingDelete?.name ?? "";
+  return (
+    <ConfirmDialog
+      open={state().pendingDelete !== null && !props.excludedServerIds?.includes(state().pendingDelete?.serverId ?? "")}
+      title={t("settings.hostedServers.deleteTitle", { name: name() })}
+      description={t("settings.hostedServers.deleteDescription")}
+      confirmLabel={t("common.delete")}
+      pendingLabel={t("settings.hostedServers.deleting")}
+      pending={state().deleting}
+      error={state().deleteError ?? undefined}
+      initialFocus="cancel"
+      restoreFocusTarget={props.restoreFocusTarget}
+      onCancel={props.store.cancelDelete}
+      onConfirm={props.store.confirmDelete}
+    >
+      <Field label={t("settings.hostedServers.deleteConfirmLabel", { name: name() })}>
+        <Input
+          value={state().deleteConfirmName}
+          autocomplete="off"
+          spellcheck={false}
+          disabled={state().deleting}
+          onValueChange={props.store.setDeleteConfirmName}
+        />
+      </Field>
+    </ConfirmDialog>
   );
 }

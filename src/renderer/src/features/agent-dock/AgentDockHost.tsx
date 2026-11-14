@@ -48,8 +48,10 @@ import { latestVisibleAgentMessageId } from "../conversation/conversation-read-s
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
+import { speechPort } from "../speech/speech-port";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
+import { AgentDockVoiceConversation } from "./AgentDockVoiceConversation";
 import { agentDockPort } from "./agent-dock-port";
 import {
   type AgentDockPlacement,
@@ -468,6 +470,8 @@ function WindowAgentDock(props: { serverId: string }) {
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
   const voice = createAgentDockVoice(() => props.serverId);
+  const [voiceRequest, setVoiceRequest] = createSignal(0);
+  onSettled(() => speechPort().voice.onShortcut(() => setVoiceRequest((value) => value + 1)));
 
   return (
     <AgentDock
@@ -487,6 +491,10 @@ function WindowAgentDock(props: { serverId: string }) {
       onOpenInMain={(seat) => (seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id))}
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
       voice={voice}
+      voiceRequest={voiceRequest()}
+      renderVoiceConversation={(agent, onEnd) => (
+        <AgentDockVoiceConversation agent={agent} serverId={props.serverId} onEnd={onEnd} />
+      )}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
       onOpenLink={(url) => void appPort().openUrl(url)}

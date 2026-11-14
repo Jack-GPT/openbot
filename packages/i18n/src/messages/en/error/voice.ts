@@ -41,6 +41,9 @@ export const messages = defineMessages("error.voice", {
     "OpenAI refused to start live voice. Try again later, or turn off live voice in Settings to talk by voice.",
   "error.voice.live.off": "Codex live voice is off. Turn it on in Settings → Voice.",
   "error.voice.moss.failed": "MOSS Live could not connect. Check your API key and try again.",
+  "error.voice.shortcut.invalid": "Use a letter, number, function key or Space with Ctrl, Alt or the system modifier.",
+  "error.voice.shortcut.saveFailed": "OpenBot could not save the voice shortcut. Try again.",
+  "error.voice.shortcut.unavailable": "OpenBot could not register this shortcut. Choose a different key combination.",
   // The user's own voice server.
   "error.voice.server.routeOff": "The voice server is not set up for this. Check Settings → Voice.",
   "error.voice.server.keyRefused": "{host} refused the API key.",

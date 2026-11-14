@@ -25,8 +25,8 @@ import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { matchesAppShortcut } from "./app-shortcuts";
 import { settingsPort } from "./settings-port";
-import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
@@ -141,12 +141,11 @@ const Settings = createSimpleContext({
     createEffect(appSettingsOpen, (open) => {
       if (!open) setNotificationFocusRequest(null);
     });
-    /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
+    /** A hosted server that the server menu asked to delete. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
-      nonce: number;
+      restoreFocusTarget?: HTMLElement | null | undefined;
     } | null>(null);
-    let hostedServerDeleteNonce = 0;
     // A write of equal values keeps the current object. A new object rebuilds the options of each
     // Select on the page, and a Select reports its value again for new options. Without this, a
     // Select that saves the value it reports freezes the window (#5708).
@@ -499,17 +498,13 @@ const Settings = createSimpleContext({
       openAppSettings(trigger, "notifications");
     }
 
-    /** Opens the Hosted servers tab with the delete confirmation of one server. */
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
-      setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
-      openAppSettings(trigger, "hosted-servers");
+      setHostedServerDeleteRequest({ serverId, restoreFocusTarget: trigger });
     }
 
     onSettled(() => {
-      // The native Preferences menu item sends the same request from main, so the shortcut below only
-      // covers the window itself: both land here, and the dialog owns the open state either way.
       const handleSettingsShortcut = (event: KeyboardEvent) => {
-        if (!isOpenSettingsShortcut(event)) return;
+        if (event.defaultPrevented || !matchesAppShortcut("settings", event)) return;
         event.preventDefault();
         openAppSettings(event.target instanceof HTMLElement ? event.target : null);
       };

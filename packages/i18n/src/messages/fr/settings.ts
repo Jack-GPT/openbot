@@ -95,8 +95,7 @@ export const messages = {
   "settings.quitGuard.always": "Toujours",
   "settings.quitGuard.never": "Jamais",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
-  "settings.externalLinks.description":
-    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
+  "settings.externalLinks.description": "Les liens des discussions et des pages de connexion s’ouvrent ici.",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
@@ -122,6 +121,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Actions de message compactes",
   "settings.compactMessageActions.description":
     "Affiche Réagir, Répondre et Plus à côté d’un message, et l’heure entre les messages. Désactivé, toutes les actions et l’heure s’affichent sous chaque message.",
+  "settings.voiceShortcut.off": "Désactivé",
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
     "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Avec les agents qui ne le permettent pas, ils attendent dans la file.",
@@ -300,6 +300,12 @@ export const messages = {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.shortcuts.reset": "Rétablir le raccourci par défaut",
+  "settings.shortcuts.conflict": "Ce raccourci est déjà utilisé.",
+  "settings.shortcuts.invalid":
+    "Utilisez une lettre, un chiffre, une flèche ou une touche de fonction avec Ctrl, Alt ou la touche système.",
+  "settings.tab.shortcuts.title": "Raccourcis clavier",
+  "settings.tab.shortcuts.description": "Configurez les raccourcis clavier d’OpenBot.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
@@ -321,11 +327,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Choisissez où le dock s’affiche et quels agents il contient.",
   "settings.tab.updates.title": "Mises à jour",
   "settings.tab.updates.description": "Garder OpenBot à jour sur cet ordinateur.",
-  "settings.tab.billing.title": "Facturation",
-  "settings.tab.billing.description": "Licence, offres des serveurs, moyen de paiement et factures.",
-  "settings.tab.hostedServers.title": "Serveurs hébergés",
-  "settings.tab.hostedServers.description":
-    "Créer des serveurs OpenBot qui fonctionnent quand cet ordinateur est éteint.",
   "settings.sections.label": "Sections des réglages",
   "settings.panel.resize": "Redimensionner le panneau de droite",
   "settings.preferences.loadFailed": "Impossible de charger vos réglages.",

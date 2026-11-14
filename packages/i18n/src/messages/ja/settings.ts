@@ -88,7 +88,7 @@ export const messages = {
   "settings.quitGuard.always": "常に",
   "settings.quitGuard.never": "しない",
   "settings.externalLinks.title": "外部リンクの開き方",
-  "settings.externalLinks.description": "チャット、サインインページ、請求ページのリンクをここで開きます。",
+  "settings.externalLinks.description": "チャットやサインインページのリンクをここで開きます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザー",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "既定のブラウザー（{name}）",
@@ -112,6 +112,7 @@ export const messages = {
   "settings.compactMessageActions.title": "コンパクトなメッセージ操作",
   "settings.compactMessageActions.description":
     "メッセージの横にリアクション、返信、その他を表示し、メッセージの間に時刻を表示します。オフにすると、すべての操作と時刻が各メッセージの下に表示されます。",
+  "settings.voiceShortcut.off": "オフ",
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。対応していないエージェントでは、キューで待機します。",
@@ -284,6 +285,12 @@ export const messages = {
     "オン: 利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。オフ: 同じメタデータをランダムなインストール ID のみとともに送信します。チャット、ファイル、プロンプトは送信しません。この設定はこのブラウザーに適用されます。",
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピューターでの OpenBot の動作を設定します。",
+  "settings.shortcuts.reset": "既定に戻す",
+  "settings.shortcuts.conflict": "このショートカットは使用済みです。",
+  "settings.shortcuts.invalid":
+    "文字、数字、矢印、ファンクションキーのいずれかを Ctrl、Alt、またはシステムキーと組み合わせてください。",
+  "settings.tab.shortcuts.title": "キーボードショートカット",
+  "settings.tab.shortcuts.description": "OpenBot のキーボードショートカットを設定します。",
   "settings.tab.agents.title": "エージェント",
   "settings.tab.agents.description":
     "エージェントごとに設定しないときに、このコンピューターのエージェントができることを選びます。",
@@ -305,11 +312,6 @@ export const messages = {
   "settings.tab.agentDock.description": "ドックを表示する場所と、ドックに置くエージェントを選びます。",
   "settings.tab.updates.title": "アップデート",
   "settings.tab.updates.description": "このコンピューターの OpenBot を最新に保ちます。",
-  "settings.tab.billing.title": "お支払い",
-  "settings.tab.billing.description": "ライセンス、サーバーのプラン、支払い方法、請求書。",
-  "settings.tab.hostedServers.title": "ホスト型サーバー",
-  "settings.tab.hostedServers.description":
-    "このコンピューターの電源が切れているときも動作する OpenBot サーバーを作成します。",
   "settings.sections.label": "設定のセクション",
   "settings.panel.resize": "右パネルのサイズを変更",
   "settings.preferences.loadFailed": "設定を読み込めませんでした。",

@@ -601,7 +601,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   if (message) setPageContext(message, text);
                 }}
                 onPageMessage={addPageText}
-                isPageAppShortcut={isChatVisualAppShortcut}
+                isPageAppShortcut={(key) => isChatVisualAppShortcut(key, Boolean(props.runtime))}
                 quoteShortcut={deviceQuoteShortcut(props.platform)}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}

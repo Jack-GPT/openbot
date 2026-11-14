@@ -17,7 +17,6 @@ import {
   onSettled,
   untrack,
 } from "solid-js";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -28,6 +27,7 @@ import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { matchesAppShortcut } from "../settings/app-shortcuts";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
 import {
@@ -326,7 +326,8 @@ const ServerScope = createSimpleContext({
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
         if (
-          !isGlobalSearchShortcut(event) ||
+          event.defaultPrevented ||
+          !matchesAppShortcut("globalSearch", event) ||
           centralAuth().status !== "signed_in" ||
           setupState()?.completed !== true
         ) {

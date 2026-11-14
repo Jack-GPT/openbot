@@ -91,7 +91,7 @@ export const messages = {
   "settings.quitGuard.always": "Immer",
   "settings.quitGuard.never": "Nie",
   "settings.externalLinks.title": "Externe Links öffnen in",
-  "settings.externalLinks.description": "Links in Chats, Anmeldeseiten und Abrechnungsseiten öffnen sich hier.",
+  "settings.externalLinks.description": "Links in Chats und Anmeldeseiten öffnen sich hier.",
   "settings.externalLinks.defaultBrowser": "Standardbrowser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Standardbrowser ({name})",
@@ -115,6 +115,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompakte Nachrichtenaktionen",
   "settings.compactMessageActions.description":
     "Zeigt Reagieren, Antworten und Mehr neben einer Nachricht und die Uhrzeit zwischen den Nachrichten. Ist es aus, stehen alle Aktionen und die Uhrzeit unter jeder Nachricht.",
+  "settings.voiceShortcut.off": "Aus",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
     "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Bei Agenten, die das nicht können, warten sie in der Warteschlange.",
@@ -291,6 +292,12 @@ export const messages = {
     "An: Nutzungs- und Zuverlässigkeitsmetadaten gehen mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem. Aus: Dieselben Metadaten gehen nur mit einer zufälligen Installations-ID. Chats, Dateien und Prompts werden nie gesendet. Diese Einstellung gilt für diesen Browser.",
   "settings.tab.general.title": "Allgemein",
   "settings.tab.general.description": "Lege fest, wie sich OpenBot auf diesem Computer verhält.",
+  "settings.shortcuts.reset": "Standard wiederherstellen",
+  "settings.shortcuts.conflict": "Dieses Tastenkürzel ist bereits belegt.",
+  "settings.shortcuts.invalid":
+    "Verwende einen Buchstaben, eine Ziffer, eine Pfeil- oder Funktionstaste mit Strg, Alt oder der Systemtaste.",
+  "settings.tab.shortcuts.title": "Tastenkürzel",
+  "settings.tab.shortcuts.description": "Tastenkürzel in OpenBot festlegen.",
   "settings.tab.agents.title": "Agenten",
   "settings.tab.agents.description":
     "Lege fest, was die Agenten auf diesem Computer tun dürfen, wenn du es nicht für einen Agenten festlegst.",
@@ -312,10 +319,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Wähle, wo das Dock erscheint und welche Agenten darin sind.",
   "settings.tab.updates.title": "Updates",
   "settings.tab.updates.description": "Halte OpenBot auf diesem Computer aktuell.",
-  "settings.tab.billing.title": "Abrechnung",
-  "settings.tab.billing.description": "Lizenz, Servertarife, Zahlungsmethode und Rechnungen.",
-  "settings.tab.hostedServers.title": "Gehostete Server",
-  "settings.tab.hostedServers.description": "Erstelle OpenBot-Server, die auch bei ausgeschaltetem Computer laufen.",
   "settings.sections.label": "Einstellungsbereiche",
   "settings.panel.resize": "Größe des rechten Bereichs ändern",
   "settings.preferences.loadFailed": "Deine Einstellungen konnten nicht geladen werden.",

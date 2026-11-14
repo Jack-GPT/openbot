@@ -88,8 +88,7 @@ export const messages = {
   "settings.quitGuard.always": "Her zaman",
   "settings.quitGuard.never": "Asla",
   "settings.externalLinks.title": "Harici bağlantıları şurada aç",
-  "settings.externalLinks.description":
-    "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır.",
+  "settings.externalLinks.description": "Sohbetlerdeki ve oturum açma sayfalarındaki bağlantılar burada açılır.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Varsayılan tarayıcı ({name})",
@@ -113,6 +112,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompakt mesaj işlemleri",
   "settings.compactMessageActions.description":
     "Bir mesajın yanında Tepki ver, Yanıtla ve Daha fazla seçeneklerini, mesajların arasında da saati gösterir. Kapalıyken tüm işlemler ve saat her mesajın altında görünür.",
+  "settings.voiceShortcut.off": "Kapalı",
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
     "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. Bunu desteklemeyen ajanlarda kuyrukta bekler.",
@@ -284,6 +284,11 @@ export const messages = {
     "Açık: kullanım ve güvenilirlik meta verileri hesap kimliğiniz ve e-postanızla birlikte OpenBot'un kendi barındırdığı analizlerine gönderilir. Kapalı: aynı meta veriler yalnızca rastgele bir kurulum kimliğiyle gönderilir. Sohbetler, dosyalar ve istemler asla gönderilmez. Bu ayar bu tarayıcı için geçerlidir.",
   "settings.tab.general.title": "Genel",
   "settings.tab.general.description": "OpenBot'un bu bilgisayarda nasıl davranacağını kontrol edin.",
+  "settings.shortcuts.reset": "Varsayılanı geri yükle",
+  "settings.shortcuts.conflict": "Bu kısayol zaten kullanılıyor.",
+  "settings.shortcuts.invalid": "Ctrl, Alt veya sistem tuşuyla birlikte bir harf, sayı, ok ya da işlev tuşu kullanın.",
+  "settings.tab.shortcuts.title": "Klavye kısayolları",
+  "settings.tab.shortcuts.description": "OpenBot klavye kısayollarını ayarla.",
   "settings.tab.agents.title": "Ajanlar",
   "settings.tab.agents.description":
     "Bir ajan için ayarlamadığınızda bu bilgisayardaki ajanların neler yapabileceğini seçin.",
@@ -305,10 +310,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Yuvanın nerede görüneceğini ve hangi ajanların yuvada olacağını seçin.",
   "settings.tab.updates.title": "Güncellemeler",
   "settings.tab.updates.description": "OpenBot'u bu bilgisayarda güncel tutun.",
-  "settings.tab.billing.title": "Faturalandırma",
-  "settings.tab.billing.description": "Lisans, sunucu planları, ödeme yöntemi ve faturalar.",
-  "settings.tab.hostedServers.title": "Barındırılan sunucular",
-  "settings.tab.hostedServers.description": "Bu bilgisayar kapalıyken çalışan OpenBot sunucuları oluşturun.",
   "settings.sections.label": "Ayar bölümleri",
   "settings.panel.resize": "Sağ paneli yeniden boyutlandır",
   "settings.preferences.loadFailed": "Ayarlarınız yüklenemedi.",

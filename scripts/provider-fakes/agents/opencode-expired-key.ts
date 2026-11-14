@@ -9,6 +9,7 @@ const EXPIRED =
   "This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store. Signing in again will not renew this key.";
 const PROVIDER_AUTH = process.env.FAKE_PROVIDER_AUTH === "1";
 const MODEL = PROVIDER_AUTH ? "anthropic/claude-sonnet-5" : "opencode-go/glm-5.3";
+const CONSOLE_MODEL = "opencode/claude-opus-5-5";
 
 interface ProviderOptions {
   options?: { apiKey?: string; baseURL?: string };
@@ -21,7 +22,12 @@ const key = configKey ?? process.env.FAKE_AUTH_KEY ?? process.env.OPENCODE_API_K
 const setup = (sessionId: string | undefined) => ({
   sessionId,
   models: {
-    availableModels: [{ modelId: MODEL, name: PROVIDER_AUTH ? "Claude Sonnet 5" : "GLM 5.3" }],
+    availableModels: PROVIDER_AUTH
+      ? [{ modelId: MODEL, name: "Claude Sonnet 5" }]
+      : [
+          { modelId: MODEL, name: "GLM 5.3" },
+          { modelId: CONSOLE_MODEL, name: "Claude Opus 5.5" },
+        ],
     currentModelId: MODEL,
   },
 });

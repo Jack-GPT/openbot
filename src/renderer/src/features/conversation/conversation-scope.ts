@@ -895,6 +895,7 @@ export function createConversationViewScope(props: ConversationProps) {
   });
   const search = createSearchStore({
     props,
+    web: Boolean(props.runtime),
     chatSearchOpen,
     chatSearchQuery,
     activeChatSearchIndex,
@@ -920,6 +921,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const [threadSearchMessageIds, setThreadSearchMessageIds] = createSignal<string[]>([]);
   const [threadScrollElement, setThreadScrollElement] = createSignal<HTMLElement>();
   const threadSearch = createSearchStore({
+    web: Boolean(props.runtime),
     props: {
       get messages() {
         return props.threads?.conversation?.messages.map((message) => ({ id: message.id, body: message.text })) ?? [];

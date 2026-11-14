@@ -16,7 +16,6 @@ import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
 import { LayoutProvider } from "../src/layout";
 import { PlatformProvider } from "../src/platform";
 import { STORY_AGENTS, STORY_SERVERS } from "../src/preview/fixtures";
-import { createMockBilling } from "../src/preview/mock-billing";
 import type { MockVoiceOptions } from "../src/preview/mock-voice";
 import { createMockOpenBot } from "./mock-openbot";
 import { SettingsPageStory } from "./settings-page-story";
@@ -78,10 +77,6 @@ const storyAgentDock = {
 
 function SettingsModalStory(props: {
   initialOpen: boolean;
-  /** Adds the Hosted servers tab with a stopped server and a server whose plan ended. */
-  hostedServers?: boolean;
-  /** How long the hosted server list takes to answer. */
-  hostedServersDelayMs?: number;
   initialTab?: SettingsTab;
   openTab?: SettingsTab;
   /** A restart that a server admin asked for. */
@@ -96,7 +91,6 @@ function SettingsModalStory(props: {
   agentDock?: boolean;
 }) {
   const previousApi = window.openbot;
-  const billingApi = createMockBilling();
   const mock = createMockOpenBot(props.voice);
   window.openbot = mock.api;
   onCleanup(() => {
@@ -105,13 +99,6 @@ function SettingsModalStory(props: {
     // Storybook can render the story again before it cleans up the first render. That render's API stays.
     if (window.openbot === mock.api) window.openbot = previousApi;
   });
-  const hostedServersApi = {
-    ...mock.api.hostedServers,
-    list: async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, props.hostedServersDelayMs ?? 0));
-      return mock.api.hostedServers.list();
-    },
-  };
   const [open, setOpen] = createSignal(props.initialOpen);
   const [value, setValue] = createSignal({ ...storyGeneralSettings });
   const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyInitialUpdateStatus(props));
@@ -250,9 +237,6 @@ function SettingsModalStory(props: {
               onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
               onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
               onUpdateAction={runUpdateAction}
-              billingApi={billingApi}
-              hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
-              onAddHostedServer={props.hostedServers ? fn() : undefined}
               agentDock={props.agentDock ? storyAgentDock : undefined}
             />
           )}
@@ -394,26 +378,6 @@ export const MobileConnect: Story = {
 /** The agent dock above the other apps, with the switches for hiding it in the screen edge. */
 export const AgentDock: Story = {
   render: () => <SettingsModalStory initialOpen agentDock initialTab="agent-dock" />,
-};
-
-/** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
-export const Billing: Story = {
-  render: () => <SettingsModalStory initialOpen initialTab="billing" />,
-};
-
-/** An account that can create hosted servers. Start, renew and delete change the mock list. */
-export const HostedServers: Story = {
-  render: () => <SettingsModalStory initialOpen hostedServers initialTab="hosted-servers" />,
-};
-
-/** "Manage servers" with a list that answers after 300 ms: the tab opens at once and shows no spinner. */
-export const HostedServersFastList: Story = {
-  render: () => <SettingsModalStory initialOpen hostedServers hostedServersDelayMs={300} openTab="hosted-servers" />,
-};
-
-/** "Manage servers" with a list that answers after 3 s: the spinner fades in after its delay. */
-export const HostedServersSlowList: Story = {
-  render: () => <SettingsModalStory initialOpen hostedServers hostedServersDelayMs={3_000} openTab="hosted-servers" />,
 };
 
 export const ScheduledRemoteUpdate: Story = {

@@ -28,13 +28,14 @@ import { Effect } from "effect";
 import { BrowserWindow, type WebContents } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
-import { MossLiveSession } from "../moss-live";
+import { MossLiveSession, type MossStopReason } from "../moss-live";
 import { acceptEmpty } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { sendToRenderer } from "../renderer-ipc";
 import { voiceLiveEventFromWire } from "../team-api/route-live-voice";
 import type { VoiceApiKeyStore } from "../voice-api-key-store";
 import type { VoiceServerService } from "../voice-server-service";
+import type { VoiceShortcut } from "../voice-shortcut";
 import type { VoiceSpeechService } from "../voice-speech-service";
 import type { VoiceTranscriptionService } from "../voice-transcription-service";
 import { agentRequest } from "./agent-inputs";
@@ -55,6 +56,7 @@ import {
   parseVoiceServerConnection,
   parseVoiceServerSave,
   parseVoiceSettings,
+  parseVoiceShortcut,
   parseVoiceStream,
   parseVoiceStreamAudio,
   parseVoiceTranscription,
@@ -64,6 +66,7 @@ export interface VoiceIpcDependencies {
   voice: VoiceTranscriptionService;
   speech: VoiceSpeechService;
   mossKey: VoiceApiKeyStore;
+  shortcut: VoiceShortcut | null;
   /** The user's own server. While one of its routes is on, it replaces the model on this computer. */
   server: VoiceServerService;
   /** Keeps a voice turn's recording as an attachment draft. Voice turns go to this computer's host only. */
@@ -81,6 +84,7 @@ export function voiceIpcHandlers({
   voice,
   speech,
   mossKey,
+  shortcut,
   server,
   service,
   remoteServers,
@@ -88,13 +92,13 @@ export function voiceIpcHandlers({
 }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
   const mossSessions = new Map<WebContents, MossLiveSession>();
   const watchedMossOwners = new WeakSet<WebContents>();
-  const stopMoss = (owner: WebContents) => {
-    mossSessions.get(owner)?.close();
+  const stopMoss = (owner: WebContents, reason: MossStopReason) => {
+    mossSessions.get(owner)?.close(reason);
     mossSessions.delete(owner);
   };
-  const stopAllMoss = (error: string) => {
+  const stopAllMoss = (reason: "disabled" | "key-removed", error: string) => {
     for (const owner of mossSessions.keys()) {
-      stopMoss(owner);
+      stopMoss(owner, reason);
       sendToRenderer(BrowserWindow.fromWebContents(owner), IPC_ENDPOINTS.voice.mossEvent, { type: "ended", error });
     }
   };
@@ -209,7 +213,7 @@ export function voiceIpcHandlers({
       getSpeechSettings: handler((): SpeechSettings => speech.getSettings()),
       setSpeechSettings: payloadHandler(parseSpeechSettings, async (settings): Promise<SpeechSettings> => {
         const saved = await runCauseEffect(speech.setSettings(settings));
-        if (!saved.mossLive) stopAllMoss(sourceText("error.voice.live.disconnected"));
+        if (!saved.mossLive) stopAllMoss("disabled", sourceText("error.voice.live.disconnected"));
         if (!saved.codexLive) {
           for (const owner of liveSessions.keys()) stopLiveSessions(owner, sourceText("error.voice.live.off"));
         }
@@ -298,7 +302,8 @@ export function voiceIpcHandlers({
           mossKey.set(key).pipe(
             Effect.tap(() =>
               Effect.sync(() => {
-                if (key === null) stopAllMoss(sourceText("error.voice.cloud.keyRequired", { provider: "MOSS" }));
+                if (key === null)
+                  stopAllMoss("key-removed", sourceText("error.voice.cloud.keyRequired", { provider: "MOSS" }));
               }),
             ),
             Effect.as(key !== null),
@@ -311,7 +316,7 @@ export function voiceIpcHandlers({
         if (!mossLive) throw new Error(sourceText("error.voice.moss.failed"));
         const key = mossKey.get();
         if (!key) throw new Error(sourceText("error.voice.cloud.keyRequired", { provider: "MOSS" }));
-        stopMoss(sender);
+        stopMoss(sender, "replaced");
         const session = new MossLiveSession(key, mossLiveVoice ?? null, (event) => {
           if (mossSessions.get(sender) !== session) return;
           sendToRenderer(BrowserWindow.fromWebContents(sender), IPC_ENDPOINTS.voice.mossEvent, event);
@@ -320,10 +325,10 @@ export function voiceIpcHandlers({
         mossSessions.set(sender, session);
         if (!watchedMossOwners.has(sender)) {
           watchedMossOwners.add(sender);
-          sender.once("destroyed", () => stopMoss(sender));
-          sender.on("render-process-gone", () => stopMoss(sender));
+          sender.once("destroyed", () => stopMoss(sender, "window-closed"));
+          sender.on("render-process-gone", () => stopMoss(sender, "renderer-exited"));
           sender.on("did-start-navigation", (details) => {
-            if (details.isMainFrame && !details.isSameDocument) stopMoss(sender);
+            if (details.isMainFrame && !details.isSameDocument) stopMoss(sender, "navigation");
           });
         }
         try {
@@ -334,11 +339,16 @@ export function voiceIpcHandlers({
           throw error;
         }
       }),
-      stopMoss: eventHandler(({ sender }) => stopMoss(sender)),
+      stopMoss: eventHandler(({ sender }) => stopMoss(sender, "stopped")),
       mossAudio: eventPayloadHandler(parseMossAudio, ({ sender }, pcm) => mossSessions.get(sender)?.audio(pcm)),
       mossControl: eventPayloadHandler(parseMossControl, ({ sender }, input) =>
         mossSessions.get(sender)?.control(input),
       ),
+      getShortcut: handler(() => shortcut?.value ?? null),
+      setShortcut: payloadHandler(parseVoiceShortcut, (value) => {
+        if (!shortcut) throw new Error(sourceText("error.voice.shortcut.unavailable"));
+        return Effect.runPromise(shortcut.set(value));
+      }),
     },
   };
 }

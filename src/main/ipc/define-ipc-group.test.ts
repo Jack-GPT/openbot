@@ -27,6 +27,7 @@ import {
   parseVoiceServerConnection,
   parseVoiceServerSave,
   parseVoiceSettings,
+  parseVoiceShortcut,
   parseVoiceStream,
   parseVoiceStreamAudio,
 } from "./voice-inputs";
@@ -113,6 +114,8 @@ function registerVoice(
     stopMoss: handler(() => undefined),
     mossAudio: payloadHandler(parseMossAudio, () => undefined),
     mossControl: payloadHandler(parseMossControl, () => undefined),
+    getShortcut: handler(() => null),
+    setShortcut: payloadHandler(parseVoiceShortcut, (shortcut) => shortcut),
   });
 }
 

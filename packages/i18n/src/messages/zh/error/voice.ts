@@ -35,4 +35,7 @@ export const messages = {
   "error.voice.live.refused": "OpenAI 拒绝启动实时语音。请稍后重试，或在 设置 中关闭实时语音以用语音对话。",
   "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
   "error.voice.moss.failed": "MOSS 实时语音连接失败。请检查 API Key 后重试。",
+  "error.voice.shortcut.invalid": "请同时按 Ctrl、Alt 或系统修饰键，以及字母、数字、功能键或空格键。",
+  "error.voice.shortcut.saveFailed": "OpenBot 无法保存语音快捷键。请重试。",
+  "error.voice.shortcut.unavailable": "OpenBot 无法注册此快捷键。请选择其他按键组合。",
 } as const satisfies PartialTranslation<typeof source>;

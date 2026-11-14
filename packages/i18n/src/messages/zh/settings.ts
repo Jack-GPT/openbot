@@ -87,7 +87,7 @@ export const messages = {
   "settings.quitGuard.always": "始终",
   "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
-  "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
+  "settings.externalLinks.description": "聊天和登录页面中的链接在这里打开。",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "默认浏览器",
   "settings.externalLinks.openbot": "OpenBot",
@@ -102,6 +102,9 @@ export const messages = {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "发送快捷键",
   "settings.sendShortcut.description": "选择在这台设备和浏览器上发送消息的按键。",
+  "settings.voiceShortcut.title": "语音对话快捷键",
+  "settings.voiceShortcut.description": "在智能体停靠栏中与选中的智能体开启语音对话。",
+  "settings.voiceShortcut.record": "请按下快捷键",
   "settings.chatOrder.description": "选择此设备的侧栏在哪里显示未读聊天。选择手动会关闭未读分组。",
   "settings.sendShortcut.enter": "按 Enter 发送",
   "settings.sendShortcut.modEnterMac": "按 ⌘Enter 发送",
@@ -111,6 +114,7 @@ export const messages = {
   "settings.compactMessageActions.title": "紧凑的消息操作",
   "settings.compactMessageActions.description":
     "在消息旁显示“回应”“回复”和“更多”，并在消息之间显示时间。关闭后，所有操作和时间都显示在每条消息下方。",
+  "settings.voiceShortcut.off": "关闭",
   "settings.busyMessage.title": "助手工作时的消息处理方式",
   "settings.busyMessage.description":
     "新消息会并入助手当前的工作，而不是进入队列。不支持此功能的助手会让消息在队列中等待。",
@@ -277,6 +281,11 @@ export const messages = {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "通用",
   "settings.tab.general.description": "控制 OpenBot 在这台电脑上的行为。",
+  "settings.shortcuts.reset": "恢复默认",
+  "settings.shortcuts.conflict": "这个快捷键已被占用。",
+  "settings.shortcuts.invalid": "请将 Ctrl、Alt 或系统键与字母、数字、方向键或功能键组合使用。",
+  "settings.tab.shortcuts.title": "快捷键",
+  "settings.tab.shortcuts.description": "设置 OpenBot 的键盘快捷键。",
   "settings.tab.agents.title": "助手",
   "settings.tab.agents.description": "选择这台电脑上的助手在你未单独设置时可以做什么。",
   "settings.tab.notifications.title": "通知",
@@ -296,10 +305,6 @@ export const messages = {
   "settings.tab.agentDock.description": "选择停靠栏显示的位置，以及其中的智能体。",
   "settings.tab.updates.title": "更新",
   "settings.tab.updates.description": "让这台电脑上的 OpenBot 保持最新。",
-  "settings.tab.billing.title": "账单",
-  "settings.tab.billing.description": "许可证、服务器套餐、支付方式和发票。",
-  "settings.tab.hostedServers.title": "托管服务器",
-  "settings.tab.hostedServers.description": "创建即使这台电脑关机也能运行的 OpenBot 服务器。",
   "settings.sections.label": "设置分区",
   "settings.panel.resize": "调整右侧面板宽度",
   // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.

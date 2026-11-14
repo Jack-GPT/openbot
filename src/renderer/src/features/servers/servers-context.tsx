@@ -1,4 +1,3 @@
-import type { HostedServerEntryPoint } from "@openbot/contracts/hosted-servers";
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
@@ -71,13 +70,6 @@ const Servers = createSimpleContext({
     const [createLocalServerOpen, setCreateLocalServerOpen] = createSignal(false);
     /** The dialog with the command that installs a server on another computer. */
     const [installServerOpen, setInstallServerOpen] = createSignal(false);
-    /** Where the user opened the hosted server plans, or null while they are closed. */
-    const [addServerEntryPoint, setAddServerEntryPoint] = createSignal<HostedServerEntryPoint | null>(null);
-    const addServerOpen = () => addServerEntryPoint() !== null;
-    const setAddServerOpen = (...args: [open: false] | [open: true, entryPoint: HostedServerEntryPoint]) =>
-      setAddServerEntryPoint(args[0] ? args[1] : null);
-    // True when the account can create hosted servers. The plus button then opens the plans.
-    const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
     /** The hosted servers of this account. The server menu can delete these. */
     const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
     /** True after the hosted servers were read once. Until then, an owned server can be a hosted one. */
@@ -306,17 +298,16 @@ const Servers = createSimpleContext({
         .host.getStatus()
         .then(setHostStatus)
         .catch(() => undefined);
-      void refreshHostedServersAvailable();
-      // Another account can sign in after the start, so the plus button reads its access again.
+      void refreshHostedServerIds();
+      // Another account can sign in after the start and have different hosted servers.
       let signedInUserId: string | null = null;
       const unsubscribeAuth = serversPort().auth.onEvent((state) => {
         if (state.status !== "signed_in" && state.status !== "signed_out") return;
         const userId = state.status === "signed_in" ? state.user.id : null;
         if (userId === signedInUserId) return;
         signedInUserId = userId;
-        if (userId) void refreshHostedServersAvailable();
+        if (userId) void refreshHostedServerIds();
         else {
-          setHostedServersAvailable(false);
           setHostedServerIds(new Set<string>());
           setHostedServersLoaded(false);
         }
@@ -329,19 +320,16 @@ const Servers = createSimpleContext({
     });
 
     /**
-     * Reads again whether the account can create hosted servers, and which hosted servers it has. The
-     * account can change after the start.
+     * Reads the hosted servers of this account again. The account can change after the start.
      */
-    async function refreshHostedServersAvailable(): Promise<boolean> {
-      // A failed read keeps the last answer: a network error does not turn the plans off.
+    async function refreshHostedServerIds(): Promise<void> {
+      // A failed read keeps the last list so the server menu keeps its actions.
       const list = await serversPort()
         .hostedServers.list()
         .catch(() => null);
-      if (!list) return hostedServersAvailable();
-      setHostedServersAvailable(list.available);
+      if (!list) return;
       setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
       setHostedServersLoaded(true);
-      return list.available;
     }
 
     // Each time the user enters a server that has a new version, the update dialog opens. A selection
@@ -363,7 +351,7 @@ const Servers = createSimpleContext({
       },
     );
 
-    // A server that the add server dialog creates comes into the list as an owned remote server. Each
+    // A hosted server comes into the list as an owned remote server. Each
     // owned server is read once, so a server that another computer of this account runs is not read again.
     const readOwnedServerIds = new Set<string>();
     createEffect(
@@ -374,7 +362,7 @@ const Servers = createSimpleContext({
       (serverIds) => {
         if (serverIds.length === 0) return;
         for (const serverId of serverIds) readOwnedServerIds.add(serverId);
-        void refreshHostedServersAvailable();
+        void refreshHostedServerIds();
       },
     );
 
@@ -462,13 +450,8 @@ const Servers = createSimpleContext({
       setCreateLocalServerOpen,
       installServerOpen,
       setInstallServerOpen,
-      addServerOpen,
-      addServerEntryPoint,
-      setAddServerOpen,
-      hostedServersAvailable,
       hostedServerIds,
       hostedServersLoaded,
-      refreshHostedServersAvailable,
       reorderServers,
       localServerHidden,
       setLocalServerHidden,

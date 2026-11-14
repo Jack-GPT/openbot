@@ -88,7 +88,7 @@ export const messages = {
   "settings.quitGuard.always": "Zawsze",
   "settings.quitGuard.never": "Nigdy",
   "settings.externalLinks.title": "Otwieraj linki zewnętrzne w",
-  "settings.externalLinks.description": "Tu otwierają się linki z czatów, stron logowania i płatności.",
+  "settings.externalLinks.description": "Tu otwierają się linki z czatów i stron logowania.",
   "settings.externalLinks.defaultBrowser": "Przeglądarka",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Przeglądarka ({name})",
@@ -113,6 +113,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompaktowe akcje wiadomości",
   "settings.compactMessageActions.description":
     "Pokazuje Reaguj, Odpowiedz i Więcej obok wiadomości, a godzinę między wiadomościami. Gdy jest wyłączone, wszystkie akcje i godzina są pod każdą wiadomością.",
+  "settings.voiceShortcut.off": "Wyłączone",
   "settings.busyMessage.title": "Kieruj agentami podczas pracy",
   "settings.busyMessage.description":
     "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. W przypadku agentów, które tego nie obsługują, czekają w kolejce.",
@@ -289,6 +290,12 @@ export const messages = {
     "Włączone: metadane użycia i niezawodności trafiają do samodzielnie hostowanej analityki OpenBot wraz z ID konta i adresem e-mail. Wyłączone: te same metadane trafiają tylko z losowym ID instalacji. Czaty, pliki i prompty nigdy nie są wysyłane. To ustawienie dotyczy tej przeglądarki.",
   "settings.tab.general.title": "Ogólne",
   "settings.tab.general.description": "Określ, jak OpenBot działa na tym komputerze.",
+  "settings.shortcuts.reset": "Przywróć domyślny",
+  "settings.shortcuts.conflict": "Ten skrót jest już używany.",
+  "settings.shortcuts.invalid":
+    "Użyj litery, cyfry, strzałki lub klawisza funkcyjnego z Ctrl, Alt lub klawiszem systemowym.",
+  "settings.tab.shortcuts.title": "Skróty klawiszowe",
+  "settings.tab.shortcuts.description": "Ustaw skróty klawiszowe w OpenBot.",
   "settings.tab.agents.title": "Agenci",
   "settings.tab.agents.description":
     "Wybierz, co mogą robić agenci na tym komputerze, gdy nie ustawisz tego dla agenta.",
@@ -310,10 +317,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Wybierz, gdzie pokazuje się dok i którzy agenci są w nim.",
   "settings.tab.updates.title": "Aktualizacje",
   "settings.tab.updates.description": "Utrzymuj OpenBot w aktualnej wersji na tym komputerze.",
-  "settings.tab.billing.title": "Rozliczenia",
-  "settings.tab.billing.description": "Licencja, plany serwerów, metoda płatności i faktury.",
-  "settings.tab.hostedServers.title": "Hostowane serwery",
-  "settings.tab.hostedServers.description": "Twórz serwery OpenBot, które działają, gdy ten komputer jest wyłączony.",
   "settings.sections.label": "Sekcje ustawień",
   "settings.panel.resize": "Zmień rozmiar prawego panelu",
   "settings.preferences.loadFailed": "Nie udało się wczytać ustawień.",

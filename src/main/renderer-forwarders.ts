@@ -86,6 +86,11 @@ export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
   /** Each chat window shows a live chat, so it gets the chat, server and provider events too. */
   getChatWindows: () => BrowserWindow[];
+  getDockChat?: () => {
+    window: BrowserWindow;
+    serverId: string;
+    seat: import("@openbot/contracts/ipc").AgentDockSeatRef;
+  } | null;
   getAgentService: () => Pick<AgentService, "listAgents" | "listHiddenAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
@@ -125,6 +130,7 @@ const WORKFLOW_NOTICE_LENGTH = 200;
 export function createRendererForwarders({
   getMainWindow,
   getChatWindows,
+  getDockChat = () => null,
   getAgentService,
   getHostService,
   getHostAnalytics,
@@ -154,6 +160,16 @@ export function createRendererForwarders({
     if (!window || window.isDestroyed()) return;
     const scoped = bufferedLive ? { serverId, event, bufferedLive } : { serverId, event };
     for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.agent.scopedEvent, scoped);
+    const dock = getDockChat();
+    if (dock?.serverId === serverId && dock.seat.kind === "agent" && !bufferedLive) {
+      const agentId = dock.seat.id;
+      if (
+        ((event.type === "turn-started" || event.type === "turn-completed") && event.agentId === agentId) ||
+        ((event.type === "queue-changed" || event.type === "conversation") && event.snapshot.agentId === agentId) ||
+        (event.type === "conversation-page" && event.page.agentId === agentId)
+      )
+        sendToRenderer(dock.window, IPC_ENDPOINTS.agent.scopedEvent, scoped);
+    }
     // The local browser sends its own display state.
     if (event.type === "browser-changed" && serverId !== LOCAL_SERVER_ID) {
       forwardBrowserDisplayState(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
@@ -611,12 +627,14 @@ export function createRendererForwarders({
 
   function forwardVoiceStreamTranscript(transcript: VoiceStreamTranscript): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
+    sendToRenderer(getDockChat()?.window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
   /** `memberId` is null for a session of this computer. A member's session never goes to these windows. */
   function forwardVoiceLiveEvent(event: VoiceLiveEvent, memberId: string | null = null): void {
     if (memberId !== null) return;
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
+    sendToRenderer(getDockChat()?.window, IPC_ENDPOINTS.voice.liveEvent, event);
   }
 
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {

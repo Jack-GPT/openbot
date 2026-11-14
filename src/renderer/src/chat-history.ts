@@ -1,4 +1,5 @@
 import { createStore } from "solid-js";
+import { appShortcut, matchesAppShortcut, shortcutKeyLabels } from "./features/settings/app-shortcuts";
 
 /** A chat that the window opened: an agent chat, a channel, or a direct conversation with a person. */
 export type ChatHistoryEntry = { kind: "agent" | "channel" | "person"; id: string };
@@ -60,20 +61,16 @@ export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) 
 }
 
 /**
- * The key of Back or Forward: ⌘[ and ⌘] on macOS, Alt+← and Alt+→ elsewhere, as in a browser. Alt+←
- * in a text field stays with the field.
+ * The history shortcuts do not take editing keys away from a text field on Windows or Linux.
  */
 export function chatHistoryShortcut(
-  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target">,
+  event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "target">,
   mac: boolean,
 ): "back" | "forward" | undefined {
-  if (event.shiftKey) return undefined;
-  if (mac) {
-    if (!event.metaKey || event.altKey || event.ctrlKey) return undefined;
-    return event.key === "[" ? "back" : event.key === "]" ? "forward" : undefined;
-  }
-  if (!event.altKey || event.metaKey || event.ctrlKey || editableTarget(event.target)) return undefined;
-  return event.key === "ArrowLeft" ? "back" : event.key === "ArrowRight" ? "forward" : undefined;
+  if (!mac && editableTarget(event.target)) return undefined;
+  if (matchesAppShortcut("back", event, mac)) return "back";
+  if (matchesAppShortcut("forward", event, mac)) return "forward";
+  return undefined;
 }
 
 function editableTarget(target: EventTarget | null): boolean {
@@ -84,5 +81,9 @@ function editableTarget(target: EventTarget | null): boolean {
 
 /** The keys of Back and Forward, as a tooltip shows them on this platform. */
 export function chatHistoryKeys(mac: boolean) {
-  return mac ? { back: "⌘[", forward: "⌘]" } : { back: "Alt+←", forward: "Alt+→" };
+  const platform = mac ? "darwin" : undefined;
+  return {
+    back: shortcutKeyLabels(appShortcut("back", mac), platform).join("+"),
+    forward: shortcutKeyLabels(appShortcut("forward", mac), platform).join("+"),
+  };
 }

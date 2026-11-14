@@ -90,7 +90,7 @@ export const messages = defineMessages("settings", {
   "settings.quitGuard.always": "Always",
   "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
-  "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
+  "settings.externalLinks.description": "Links in chats and sign-in pages open here.",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
@@ -105,6 +105,9 @@ export const messages = defineMessages("settings", {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
+  "settings.voiceShortcut.title": "Voice conversation shortcut",
+  "settings.voiceShortcut.description": "Start a voice conversation with the selected agent in the agent dock.",
+  "settings.voiceShortcut.record": "Press a shortcut",
   "settings.chatOrder.description":
     "Choose where the sidebar shows unread chats on this device. Manual turns off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
@@ -116,6 +119,7 @@ export const messages = defineMessages("settings", {
   "settings.compactMessageActions.title": "Compact message actions",
   "settings.compactMessageActions.description":
     "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
+  "settings.voiceShortcut.off": "Off",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
     "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
@@ -290,6 +294,11 @@ export const messages = defineMessages("settings", {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
+  "settings.shortcuts.reset": "Restore default",
+  "settings.shortcuts.conflict": "This shortcut is already in use.",
+  "settings.shortcuts.invalid": "Use a letter, number, arrow or function key with Ctrl, Alt or the system modifier.",
+  "settings.tab.shortcuts.title": "Shortcuts",
+  "settings.tab.shortcuts.description": "Set keyboard shortcuts in OpenBot.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choose what the agents on this computer can do when you do not set it for an agent.",
@@ -311,10 +320,6 @@ export const messages = defineMessages("settings", {
   "settings.tab.agentDock.description": "Choose where the dock shows and which agents are on it.",
   "settings.tab.updates.title": "Updates",
   "settings.tab.updates.description": "Keep OpenBot current on this computer.",
-  "settings.tab.billing.title": "Billing",
-  "settings.tab.billing.description": "License, server plans, payment method and invoices.",
-  "settings.tab.hostedServers.title": "Hosted servers",
-  "settings.tab.hostedServers.description": "Create OpenBot servers that run when this computer is off.",
   "settings.sections.label": "Settings sections",
   "settings.panel.resize": "Resize right panel",
   // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.

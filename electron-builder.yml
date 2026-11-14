@@ -177,6 +177,8 @@ win:
 # `InstallLocation`. The app starts it silently (`src/main/update-service.ts`), so an update shows
 # no page.
 nsis:
+  installerIcon: build/icon-production.ico
+  uninstallerIcon: build/icon-production.ico
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:

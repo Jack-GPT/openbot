@@ -21,13 +21,10 @@ export function useServerActions() {
     servers,
     setServerMuted,
     setJoinServerOpen,
-    setAddServerOpen,
     setCreateLocalServerOpen,
     setInstallServerOpen,
-    hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
-    refreshHostedServersAvailable,
     localServerHidden,
     setLocalServerHidden,
   } = useServers();
@@ -67,37 +64,16 @@ export function useServerActions() {
     void selectServer(serverId).catch(selectFailed);
   }
 
-  /**
-   * Opens the hosted server plans when the account can create a hosted server, otherwise the invite
-   * dialog. It uses the last answer, so the click does not wait for the network; the read after it is
-   * for the next click.
-   */
   function add(): void {
     if (platform.landingPreview) return;
-    if (hostedServersAvailable()) setAddServerOpen(true, "server_rail");
-    else setJoinServerOpen(true);
-    void refreshHostedServersAvailable();
+    setJoinServerOpen(true);
   }
 
   /** Opens the dialog that names a new server on this computer. The landing preview has no main process. */
   const createLocal = platform.landingPreview ? undefined : () => setCreateLocalServerOpen(true);
 
-  /**
-   * The item for a server on this computer in the add menus of the rail and the server menu. The hosted
-   * server plans show it in their "Other options" menu, so the add menus show it only when the add
-   * button opens the invite dialog in place of the plans.
-   */
-  function addMenuCreateLocal(): (() => void) | undefined {
-    return hostedServersAvailable() ? undefined : createLocal;
-  }
-
   /** Opens the dialog with the command that installs a server on another computer and adds it to this account. */
   const installServer = platform.landingPreview ? undefined : () => setInstallServerOpen(true);
-
-  /** As `addMenuCreateLocal`: the hosted server plans show the item in their "Other options" menu. */
-  function addMenuInstallServer(): (() => void) | undefined {
-    return hostedServersAvailable() ? undefined : installServer;
-  }
 
   /**
    * Hides the server on this computer. When it is open, another server opens in its place: the first
@@ -152,10 +128,7 @@ export function useServerActions() {
     select,
     add,
     createLocal,
-    addMenuCreateLocal,
     installServer,
-    addMenuInstallServer,
-    addCreatesServer: hostedServersAvailable,
     hiddenLocal,
     callbacks,
   };

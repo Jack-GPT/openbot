@@ -14,27 +14,6 @@ export function modelDisplayName(name: string): string {
 }
 
 /**
- * OpenCode models a stored key does not buy, dropped while OpenBot supplies the key.
- *
- * The stored key is an OpenCode Go key: it buys `opencode-go/` and the free tier, not OpenCode
- * Zen. OpenCode reports both products as one catalog although they are two products on two
- * endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- so a stored key also lists
- * Zen models that answer every prompt with "Invalid API key.".
- *
- * The drop applies only while OpenBot is the one supplying the key. With no key stored, a Zen
- * model can only come from the user's own OpenCode sign-in, and that one does buy it.
- *
- * Free is decided by id and display name, after the name is resolved: `isFreeOpencodeModel`
- * is what the picker badges a model with, so the badge and the catalog cannot disagree about
- * what costs money.
- */
-export function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean {
-  const lower = id.toLowerCase();
-  if (lower.startsWith("opencode-go/")) return false;
-  return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
-}
-
-/**
  * Which OpenCode model a new agent runs, as the tier its catalog leads with.
  *
  * A provider with no `defaultProviderModel` falls back to the first model of its catalog, so list
@@ -44,8 +23,7 @@ export function isOpencodeModelUnusableWithStoredKey(id: string, name: string): 
  *
  * The order is free first, so nobody is billed for a model they did not choose, and inside the free
  * tier the recommended models lead, in their own order. Below the free tier come OpenCode's own paid
- * models -- the `opencode-go/` family the stored key buys, and any `opencode/` model behind the
- * user's own OpenCode sign-in -- and last the models behind a separate sign-in, whose token OpenBot
+ * models from `opencode-go/` and `opencode/`, then the models behind a separate sign-in, whose token OpenBot
  * can neither see nor refresh. That tail matters only for a catalog with no free tier at all; it is
  * the difference between a bad default and an unusable one.
  * Inside one tier the newest version leads, which still keeps a free model first.

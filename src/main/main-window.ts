@@ -1129,7 +1129,6 @@ export function configureApplicationMenu(
           { type: "separator" },
           {
             label: translate("menu.preferences"),
-            accelerator: "CommandOrControl+,",
             click: (_item, focusedWindow) => {
               const candidate = focusedWindow ?? BrowserWindow.getFocusedWindow();
               if (!(candidate instanceof BrowserWindow)) return;

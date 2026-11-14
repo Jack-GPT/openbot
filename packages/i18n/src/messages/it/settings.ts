@@ -91,7 +91,7 @@ export const messages = {
   "settings.quitGuard.always": "Sempre",
   "settings.quitGuard.never": "Mai",
   "settings.externalLinks.title": "Apri i link esterni in",
-  "settings.externalLinks.description": "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui.",
+  "settings.externalLinks.description": "I link nelle chat e nelle pagine di accesso si aprono qui.",
   "settings.externalLinks.defaultBrowser": "Browser predefinito",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Browser predefinito ({name})",
@@ -115,6 +115,7 @@ export const messages = {
   "settings.compactMessageActions.title": "Azioni dei messaggi compatte",
   "settings.compactMessageActions.description":
     "Mostra Reagisci, Rispondi e Altro accanto a un messaggio e l’ora tra i messaggi. Se disattivato, tutte le azioni e l’ora compaiono sotto ogni messaggio.",
+  "settings.voiceShortcut.off": "Disattivato",
   "settings.busyMessage.title": "Indirizza gli agenti mentre lavorano",
   "settings.busyMessage.description":
     "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Con gli agenti che non lo supportano, restano in coda.",
@@ -290,6 +291,12 @@ export const messages = {
     "Attivo: i metadati di utilizzo e affidabilità vanno alle analisi self-hosted di OpenBot con l'ID del tuo account e l'email. Disattivo: gli stessi metadati vanno solo con un ID di installazione casuale. Chat, file e prompt non vengono mai inviati. Questa impostazione vale per questo browser.",
   "settings.tab.general.title": "Generali",
   "settings.tab.general.description": "Controlla come si comporta OpenBot su questo computer.",
+  "settings.shortcuts.reset": "Ripristina impostazione predefinita",
+  "settings.shortcuts.conflict": "Questa scorciatoia è già in uso.",
+  "settings.shortcuts.invalid":
+    "Usa una lettera, un numero, una freccia o un tasto funzione con Ctrl, Alt o il tasto di sistema.",
+  "settings.tab.shortcuts.title": "Scorciatoie",
+  "settings.tab.shortcuts.description": "Imposta le scorciatoie da tastiera in OpenBot.",
   "settings.tab.agents.title": "Agenti",
   "settings.tab.agents.description":
     "Scegli cosa possono fare gli agenti su questo computer quando non lo imposti per un agente.",
@@ -311,10 +318,6 @@ export const messages = {
   "settings.tab.agentDock.description": "Scegli dove appare il dock e quali agenti contiene.",
   "settings.tab.updates.title": "Aggiornamenti",
   "settings.tab.updates.description": "Mantieni OpenBot aggiornato su questo computer.",
-  "settings.tab.billing.title": "Fatturazione",
-  "settings.tab.billing.description": "Licenza, piani dei server, metodo di pagamento e fatture.",
-  "settings.tab.hostedServers.title": "Server ospitati",
-  "settings.tab.hostedServers.description": "Crea server OpenBot che funzionano anche quando questo computer è spento.",
   "settings.sections.label": "Sezioni delle impostazioni",
   "settings.panel.resize": "Ridimensiona il pannello destro",
   "settings.preferences.loadFailed": "Impossibile caricare le tue impostazioni.",

@@ -52,6 +52,7 @@ export function createMossLiveConversation(
   let disposed = false;
   let muted = false;
   let sending = false;
+  let reconnecting = false;
   const scheduled = new Set<ScheduledChunk>();
   let playUntil = 0;
   let queuedBytes = 0;
@@ -60,7 +61,7 @@ export function createMossLiveConversation(
   const pending = new Map<string, AbortController>();
   const phase = (next: Phase) =>
     setState((draft) => {
-      draft.phase = next;
+      draft.phase = reconnecting ? "starting" : next;
     });
 
   function control(input: Parameters<MossLivePort["mossControl"]>[0]): void {
@@ -182,11 +183,7 @@ export function createMossLiveConversation(
     }
   }
 
-  function release(): void {
-    active = false;
-    void voice.stopMoss().catch(() => undefined);
-    for (const call of pending.values()) call.abort();
-    pending.clear();
+  function clearPlayback(): void {
     for (const item of scheduled) {
       removeChunk(item);
       item.source.stop();
@@ -194,6 +191,15 @@ export function createMossLiveConversation(
     playUntil = 0;
     done.clear();
     stoppedRuns.clear();
+  }
+
+  function release(): void {
+    active = false;
+    reconnecting = false;
+    void voice.stopMoss().catch(() => undefined);
+    for (const call of pending.values()) call.abort();
+    pending.clear();
+    clearPlayback();
     processor?.disconnect();
     if (processor) processor.onaudioprocess = null;
     processor = undefined;
@@ -219,6 +225,15 @@ export function createMossLiveConversation(
   const stopEvents = voice.onMossEvent((event) => {
     if (disposed) return;
     switch (event.type) {
+      case "reconnecting":
+        reconnecting = true;
+        phase("starting");
+        return;
+      case "reconnected":
+        reconnecting = false;
+        if (!event.resumed) clearPlayback();
+        phase(scheduled.size > 0 ? "speaking" : pending.size > 0 ? "thinking" : "listening");
+        return;
       case "ended":
         fail(new Error(event.error));
         return;

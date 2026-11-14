@@ -100,9 +100,8 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
             onViewChange={layout.setServerView}
             onSelect={serverActions.select}
             onAdd={serverActions.add}
-            onCreateLocal={serverActions.addMenuCreateLocal()}
-            onInstallServer={serverActions.addMenuInstallServer()}
-            addCreatesServer={serverActions.addCreatesServer()}
+            onCreateLocal={serverActions.createLocal}
+            onInstallServer={serverActions.installServer}
             hiddenLocal={serverActions.hiddenLocal()}
             {...serverActions.callbacks}
           />

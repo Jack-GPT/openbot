@@ -1002,6 +1002,9 @@ export const IPC_ENDPOINTS = {
     mossAudio: request<Uint8Array, void>()("voice:moss-audio"),
     mossControl: request<MossLiveControl, void>()("voice:moss-control"),
     mossEvent: event<MossLiveEvent>()("voice:moss-event"),
+    getShortcut: request<undefined, string | null>()("voice:get-shortcut"),
+    setShortcut: request<string | null, string | null>()("voice:set-shortcut"),
+    shortcut: event<undefined>()("voice:shortcut"),
     liveEvent: event<VoiceLiveEvent>()("voice:live-event"),
   },
   dynamicIsland: {

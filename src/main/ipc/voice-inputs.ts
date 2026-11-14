@@ -11,6 +11,7 @@ import {
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerRoutes,
+  isVoiceShortcut,
   isXaiSpeechVoice,
   type MossLiveControl,
   SPEECH_LIMITS,
@@ -37,6 +38,11 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { parseBaseUrl } from "./custom-provider-inputs";
 import { isObject } from "./validation";
+
+export function parseVoiceShortcut(input: unknown): string | null {
+  if (input === null || isVoiceShortcut(input)) return input;
+  throw new Error(sourceText("error.voice.shortcut.invalid"));
+}
 
 export function parseVoiceTranscription(input: unknown): VoiceTranscriptionInput {
   if (!isObject(input) || !(input.audio instanceof Uint8Array)) {

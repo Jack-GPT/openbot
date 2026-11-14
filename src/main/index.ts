@@ -164,6 +164,7 @@ import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
+import { VoiceShortcut } from "./voice-shortcut";
 import { setInitialWindowGlass, setWindowAppearance, setWorkspaceWindowZoom } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
 
@@ -311,7 +312,10 @@ if (commandLineUserDataDirectory) {
 }
 app.setName("OpenBot");
 app.enableSandbox();
-if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+if (process.platform === "win32") {
+  // The packaged ID must match the installer shortcuts. Development runs use electron.exe.
+  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
+}
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
@@ -518,6 +522,14 @@ const teardown = new TeardownRegistry({
 // Declared before the forwarders and the window surface because both read it, and it outlives any
 // one window: macOS destroys the main window on close and `activate` rebuilds it into this slot.
 const windowHolder = createMainWindowHolder();
+const voiceShortcut =
+  serverMode || hostedServer || localServerChild
+    ? null
+    : new VoiceShortcut(join(app.getPath("userData"), "openbot-voice-shortcut-v1.json"), () => {
+        if (isQuitting || services?.agentDock.openVoiceFromShortcut()) return;
+        const window = windowHolder.current;
+        if (window?.isFocused()) sendToRenderer(window, IPC_ENDPOINTS.voice.shortcut);
+      });
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
@@ -550,6 +562,7 @@ const {
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
   getChatWindows: () => windows.getChatWindows(),
+  getDockChat: () => services?.agentDock.openChat ?? null,
   getAgentService: () => services?.service ?? null,
   getHostService: () => services?.host ?? null,
   getHostAnalytics: () => services?.analytics ?? null,
@@ -921,6 +934,7 @@ function registerIpcHandlers({
       voice,
       speech,
       mossKey,
+      shortcut: voiceShortcut,
       server: voiceServer,
       service,
       remoteServers,
@@ -1694,6 +1708,10 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      if (voiceShortcut) {
+        await Effect.runPromise(voiceShortcut.load());
+        teardown.push(0, "voice shortcut", () => voiceShortcut.dispose());
+      }
       // A Signal socket of the host can be dead after sleep without knowing it; devices then cannot connect.
       const renewHostSignal = () =>
         void runCauseEffect(built.teamWebRtcBridge.renewHostSignal()).catch((error) =>

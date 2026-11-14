@@ -19,12 +19,14 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowShape } from "../../window-shape";
+import { speechPort } from "../speech/speech-port";
 import {
   AGENT_DOCK_STRIP_FEEL,
   AGENT_DOCK_STRIP_REST,
   AGENT_DOCK_STRIP_WIDTH,
   AgentDockEdgeStrip,
 } from "./AgentDockEdgeStrip";
+import { AgentDockVoiceConversation } from "./AgentDockVoiceConversation";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
@@ -58,6 +60,7 @@ export function AgentDockSurface() {
   const { t, errorMessage } = useText();
   const [presentation, setPresentation] = createSignal<AgentDockPresentation | null>(null);
   const [closeRequest, setCloseRequest] = createSignal(0);
+  const [voiceRequest, setVoiceRequest] = createSignal(0);
   const [tucked, setTuckedSignal] = createSignal(false);
   /* A plain copy: a signal write shows in a read only after the next flush. */
   let isTucked = false;
@@ -69,6 +72,7 @@ export function AgentDockSurface() {
   };
   let received = false;
   let chatOpen = false;
+  let voiceActive = false;
   let pointerIn = false;
   let dragging = false;
   /** The finished-work shelf shows results. */
@@ -194,6 +198,10 @@ export function AgentDockSurface() {
     const unsubscribe = agentDockPort().agentDock.onPresentation(apply);
     // The dock on another display opened a chat. One chat is open at a time.
     const stopCloseChat = agentDockPort().agentDock.onCloseChat(() => setCloseRequest((value) => value + 1));
+    const stopShortcut = speechPort().voice.onShortcut(() => {
+      setTucked(false);
+      setVoiceRequest((value) => value + 1);
+    });
     void agentDockPort()
       .agentDock.getPresentation()
       .then((value) => {
@@ -219,7 +227,9 @@ export function AgentDockSurface() {
       pointerIn = false;
       sync();
     };
-    const onBlur = () => setCloseRequest((value) => value + 1);
+    const onBlur = () => {
+      if (!voiceActive) setCloseRequest((value) => value + 1);
+    };
     // A menu opens and closes in a portal on the body.
     const menus = new MutationObserver(() => {
       sync();
@@ -233,6 +243,7 @@ export function AgentDockSurface() {
     return () => {
       unsubscribe();
       stopCloseChat();
+      stopShortcut();
       menus.disconnect();
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
@@ -284,6 +295,8 @@ export function AgentDockSurface() {
   /* A dock of another server starts with no chat, shelf or drag: the old dock reports no end when it goes. */
   createEffect(serverId, () => {
     chatOpen = false;
+    voiceActive = false;
+    setVoiceRequest(0);
     shelfShown = false;
     dragging = false;
     sync();
@@ -301,6 +314,13 @@ export function AgentDockSurface() {
             chat={chat}
             closeRequest={closeRequest()}
             voice={voice}
+            voiceRequest={voiceRequest()}
+            onVoiceChange={(active) => {
+              voiceActive = active;
+            }}
+            renderVoiceConversation={(agent, onEnd) => (
+              <AgentDockVoiceConversation agent={agent} serverId={server} onEnd={onEnd} screen />
+            )}
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={

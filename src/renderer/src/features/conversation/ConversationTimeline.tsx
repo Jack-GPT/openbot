@@ -1453,7 +1453,7 @@ export function ConversationTimeline() {
                             onQuote={(text) => quoteSelection(pageQuoteId(), text)}
                             quoteShortcut={deviceQuoteShortcut(props.platform)}
                             onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
-                            isAppShortcut={isChatVisualAppShortcut}
+                            isAppShortcut={(key) => isChatVisualAppShortcut(key, Boolean(props.runtime))}
                             macWindowControls={props.platform === "darwin"}
                           />
                         </article>
