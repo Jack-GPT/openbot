@@ -1,5 +1,34 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Lancez une conversation vocale en direct depuis le dock des agents. Terminez l’appel pour revenir à la discussion.",
+          "Modifiez les raccourcis dans Réglages > Raccourcis clavier. Cliquez sur une touche pour la changer ou rétablissez tous les raccourcis par défaut. Le raccourci vocal par défaut est Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Les réglages de l’application de bureau n’affichent plus la facturation ni les offres d’hébergement de serveur."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live se reconnecte après une interruption du réseau pour vous permettre de poursuivre l’appel.",
+          "L’application de bureau installée affiche les mêmes options d’ajout de serveur que la version de développement.",
+          "Les programmes d’installation et les raccourcis Windows affichent l’icône OpenBot.",
+          "Les modèles comme Claude Opus 5.5 restent visibles après l’enregistrement d’une clé OpenCode, si OpenCode les répertorie."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

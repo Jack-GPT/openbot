@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Start een live spraakgesprek vanuit het agentdock. Beëindig het gesprek om terug te gaan naar de chat.",
+          "Wijzig sneltoetsen in Instellingen > Sneltoetsen. Klik op een toets om die te wijzigen of herstel alle standaardinstellingen. De standaardsneltoets voor live spraak is Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["De instellingen van de desktopapp tonen geen facturering of abonnementen voor gehoste servers meer."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live maakt na een netwerkonderbreking opnieuw verbinding, zodat je het gesprek kunt voortzetten.",
+          "De geïnstalleerde desktopapp toont dezelfde opties om een server toe te voegen als de ontwikkelversie.",
+          "Windows-installatieprogramma’s en snelkoppelingen tonen het OpenBot-pictogram.",
+          "Modellen zoals Claude Opus 5.5 blijven zichtbaar nadat je een OpenCode-sleutel hebt opgeslagen, als OpenCode ze vermeldt."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

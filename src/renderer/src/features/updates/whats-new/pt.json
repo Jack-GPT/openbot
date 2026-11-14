@@ -1,5 +1,34 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Inicie uma conversa por voz ao vivo no dock de agentes. Encerre a chamada para voltar à conversa.",
+          "Altere os atalhos em Configurações > Atalhos de teclado. Clique em uma tecla para mudá-la ou restaure todos os padrões. O atalho padrão para voz ao vivo é Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "As configurações do aplicativo para desktop não mostram mais cobrança nem planos de servidores hospedados."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O MOSS Live se reconecta após uma interrupção da rede para que você possa continuar a chamada.",
+          "O aplicativo para desktop instalado mostra as mesmas opções para adicionar um servidor que a versão de desenvolvimento.",
+          "Os instaladores e atalhos do Windows mostram o ícone do OpenBot.",
+          "Modelos como Claude Opus 5.5 continuam visíveis após salvar uma chave OpenCode, se o OpenCode os listar."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

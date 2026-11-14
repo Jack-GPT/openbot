@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajan yuvasından canlı sesli konuşma başlatın. Sohbete dönmek için konuşmayı bitirin.",
+          "Ayarlar > Klavye kısayolları bölümünde kısayolları değiştirin. Değiştirmek için bir tuşa tıklayın veya tüm varsayılanları geri yükleyin. Canlı sesli konuşmanın varsayılan kısayolu Alt+V'dir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["Masaüstü ayarlarında faturalandırma veya barındırılan sunucu planları artık gösterilmiyor."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ağ bağlantısı kesildikten sonra MOSS Live yeniden bağlanır. Böylece konuşmaya devam edebilirsiniz.",
+          "Yüklü masaüstü uygulaması, sunucu eklemek için geliştirme sürümüyle aynı seçenekleri gösterir.",
+          "Windows yükleyicileri ve kısayolları OpenBot simgesini gösterir.",
+          "Claude Opus 5.5 gibi modeller, OpenCode bunları listeliyorsa OpenCode anahtarı kaydedildikten sonra da görünür."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

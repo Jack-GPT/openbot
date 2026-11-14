@@ -1,5 +1,34 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Inicia una conversación de voz en directo desde el dock de agentes. Termina la llamada para volver al chat.",
+          "Cambia los atajos en Ajustes > Atajos de teclado. Haz clic en una tecla para cambiarla o restablece todos los valores predeterminados. El atajo de voz en directo predeterminado es Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los ajustes de la aplicación de escritorio ya no muestran la facturación ni los planes de servidores alojados."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live se reconecta después de una interrupción de la red para que puedas continuar la llamada.",
+          "La aplicación de escritorio instalada muestra las mismas opciones para añadir un servidor que la versión de desarrollo.",
+          "Los instaladores y accesos directos de Windows muestran el icono de OpenBot.",
+          "Los modelos como Claude Opus 5.5 siguen visibles al guardar una clave de OpenCode, si OpenCode los incluye en su lista."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

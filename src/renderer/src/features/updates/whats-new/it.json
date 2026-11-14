@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Avvia una conversazione vocale in diretta dal dock degli agenti. Termina la chiamata per tornare alla chat.",
+          "Modifica le scorciatoie in Impostazioni > Scorciatoie. Fai clic su un tasto per cambiarlo oppure ripristina tutte le impostazioni predefinite. La scorciatoia predefinita per la voce in diretta è Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["Le impostazioni dell’app desktop non mostrano più la fatturazione o i piani per i server ospitati."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live si riconnette dopo un’interruzione della rete, così puoi continuare la chiamata.",
+          "L’app desktop installata mostra le stesse opzioni per aggiungere un server della versione di sviluppo.",
+          "I programmi di installazione e i collegamenti di Windows mostrano l’icona di OpenBot.",
+          "Modelli come Claude Opus 5.5 restano visibili quando salvi una chiave OpenCode, se OpenCode li elenca."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

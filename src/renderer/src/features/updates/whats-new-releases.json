@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Start a live voice call from the agent dock. End the call to return to the chat.",
+          "Change shortcuts in Settings > Shortcuts. Click a key to change it, or restore all defaults. The default for live voice is Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["Desktop settings no longer show billing or hosted server plans."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live reconnects after the network drops, so you can continue the call.",
+          "The installed desktop app shows the same options for adding a server as the development app.",
+          "Windows installers and shortcuts show the OpenBot icon.",
+          "Models such as Claude Opus 5.5 stay visible when you save an OpenCode key, if OpenCode lists them."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

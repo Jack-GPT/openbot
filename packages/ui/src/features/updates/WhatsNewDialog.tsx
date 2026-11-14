@@ -19,8 +19,8 @@ const GROUP_LABEL = {
   fixed: "update.whatsNew.group.fixed",
 } as const satisfies Record<WhatsNewGroupType, AppTextKey>;
 
-/** A longer fix list starts closed, so the new features stay in view. */
-const OPEN_FIX_LIMIT = 3;
+/** Readers can collapse a longer fix list after seeing the notes. */
+const FIX_TOGGLE_THRESHOLD = 3;
 
 export interface WhatsNewDialogProps {
   open: boolean;
@@ -216,8 +216,8 @@ function WhatsNewVersionLine(props: { version: string; previousVersion: string |
 
 function WhatsNewGroupSection(props: { group: WhatsNewGroup; onToggle: () => void }) {
   const { t } = useText();
-  const collapsible = () => props.group.type === "fixed" && props.group.items.length > OPEN_FIX_LIMIT;
-  const [expanded, setExpanded] = createSignal(false);
+  const collapsible = () => props.group.type === "fixed" && props.group.items.length > FIX_TOGGLE_THRESHOLD;
+  const [expanded, setExpanded] = createSignal(true);
   const listId = createUniqueId();
   const titleId = createUniqueId();
 

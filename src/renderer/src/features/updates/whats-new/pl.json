@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Rozpocznij rozmowę głosową na żywo z doku agentów. Zakończ rozmowę, aby wrócić do czatu.",
+          "Zmieniaj skróty w Ustawieniach > Skróty klawiszowe. Kliknij klawisz, aby go zmienić, lub przywróć wszystkie domyślne skróty. Domyślny skrót rozmowy głosowej na żywo to Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["Ustawienia aplikacji komputerowej nie pokazują już rozliczeń ani planów serwerów hostowanych."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live łączy się ponownie po przerwaniu połączenia sieciowego, więc możesz kontynuować rozmowę.",
+          "Zainstalowana aplikacja komputerowa pokazuje te same opcje dodawania serwera co wersja deweloperska.",
+          "Instalatory i skróty w systemie Windows pokazują ikonę OpenBot.",
+          "Modele takie jak Claude Opus 5.5 pozostają widoczne po zapisaniu klucza OpenCode, jeśli OpenCode umieszcza je na liście."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

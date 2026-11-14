@@ -1,5 +1,34 @@
 [
   {
+    "version": "0.68.2",
+    "date": "2026-11-14",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Starte aus dem Agenten-Dock eine Live-Sprachunterhaltung. Beende das Gespräch, um zum Chat zurückzukehren.",
+          "Ändere Tastenkürzel unter Einstellungen > Tastenkürzel. Klicke auf eine Taste, um sie zu ändern, oder stelle alle Standardkürzel wieder her. Das Standardkürzel für Live-Sprache ist Alt+V."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Die Einstellungen der Desktop-App zeigen keine Abrechnung und keine Tarife für gehostete Server mehr."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "MOSS Live verbindet sich nach einer Netzwerkunterbrechung erneut, damit du das Gespräch fortsetzen kannst.",
+          "Die installierte Desktop-App zeigt dieselben Optionen zum Hinzufügen eines Servers wie die Entwicklungsversion.",
+          "Windows-Installationsprogramme und -Verknüpfungen zeigen das OpenBot-Symbol.",
+          "Modelle wie Claude Opus 5.5 bleiben nach dem Speichern eines OpenCode-Schlüssels sichtbar, wenn OpenCode sie auflistet."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

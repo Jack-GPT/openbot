@@ -6,6 +6,24 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.68.2] - 2026-11-14
+
+### Added
+
+- Start a voice conversation in the agent dock. The dock shows the call in the same panel and returns to the chat when the call ends.
+- Press Alt+V to start a voice conversation with the agent selected in the dock. In Settings > Shortcuts, select a keycap to change a shortcut, or restore all defaults from the same page.
+
+### Removed
+
+- Remove billing and hosted server plans from desktop settings.
+
+### Fixed
+
+- Show the same server menu in installed and development desktop builds, with separate actions to join a remote server, create a server on this computer, or set one up on another computer.
+- MOSS Live reconnects after a network interruption. The app logs connection changes and speaks more naturally when it uses an agent.
+- Windows installers and shortcuts show the OpenBot icon. Development windows use a separate taskbar group.
+- Show the OpenCode Console models that the CLI lists when an OpenCode Go key is saved.
+
 ## [0.68.1] - 2026-11-13
 
 ### Added
